@@ -52,20 +52,22 @@ package KN
 import (
 	math "math"
 
+	proto "github.com/golang/protobuf/proto"
 	"github.com/orcastor/iwork-converter/proto/TSA"
 	"github.com/orcastor/iwork-converter/proto/TSCH"
 	"github.com/orcastor/iwork-converter/proto/TSD"
 	"github.com/orcastor/iwork-converter/proto/TSP"
 	"github.com/orcastor/iwork-converter/proto/TSS"
 	"github.com/orcastor/iwork-converter/proto/TSWP"
-	proto "github.com/golang/protobuf/proto"
 )
 
 // discarding unused import TSK "TSKArchives.pb"
 
 // Reference imports to suppress errors if they are not otherwise used.
-var _ = proto.Marshal
-var _ = math.Inf
+var (
+	_ = proto.Marshal
+	_ = math.Inf
+)
 
 type TransitionAttributesArchive_TransitionCustomAttributesTimingCurveType int32
 
@@ -82,6 +84,7 @@ var TransitionAttributesArchive_TransitionCustomAttributesTimingCurveType_name =
 	3: "TransitionCustomAttributesTimingCurveTypeEaseOut",
 	4: "TransitionCustomAttributesTimingCurveTypeEaseInEaseOut",
 }
+
 var TransitionAttributesArchive_TransitionCustomAttributesTimingCurveType_value = map[string]int32{
 	"TransitionCustomAttributesTimingCurveTypeLinear":        1,
 	"TransitionCustomAttributesTimingCurveTypeEaseIn":        2,
@@ -94,9 +97,11 @@ func (x TransitionAttributesArchive_TransitionCustomAttributesTimingCurveType) E
 	*p = x
 	return p
 }
+
 func (x TransitionAttributesArchive_TransitionCustomAttributesTimingCurveType) String() string {
 	return proto.EnumName(TransitionAttributesArchive_TransitionCustomAttributesTimingCurveType_name, int32(x))
 }
+
 func (x *TransitionAttributesArchive_TransitionCustomAttributesTimingCurveType) UnmarshalJSON(data []byte) error {
 	value, err := proto.UnmarshalJSONEnum(TransitionAttributesArchive_TransitionCustomAttributesTimingCurveType_value, data, "TransitionAttributesArchive_TransitionCustomAttributesTimingCurveType")
 	if err != nil {
@@ -121,6 +126,7 @@ var TransitionAttributesArchive_TransitionCustomAttributesTextDeliveryType_name 
 	3: "TransitionCustomAttributesTextDeliveryTypeByCharacter",
 	4: "TransitionCustomAttributesTextDeliveryTypeByLine",
 }
+
 var TransitionAttributesArchive_TransitionCustomAttributesTextDeliveryType_value = map[string]int32{
 	"TransitionCustomAttributesTextDeliveryTypeByObject":    1,
 	"TransitionCustomAttributesTextDeliveryTypeByWord":      2,
@@ -133,9 +139,11 @@ func (x TransitionAttributesArchive_TransitionCustomAttributesTextDeliveryType) 
 	*p = x
 	return p
 }
+
 func (x TransitionAttributesArchive_TransitionCustomAttributesTextDeliveryType) String() string {
 	return proto.EnumName(TransitionAttributesArchive_TransitionCustomAttributesTextDeliveryType_name, int32(x))
 }
+
 func (x *TransitionAttributesArchive_TransitionCustomAttributesTextDeliveryType) UnmarshalJSON(data []byte) error {
 	value, err := proto.UnmarshalJSONEnum(TransitionAttributesArchive_TransitionCustomAttributesTextDeliveryType_value, data, "TransitionAttributesArchive_TransitionCustomAttributesTextDeliveryType")
 	if err != nil {
@@ -160,6 +168,7 @@ var BuildAttributesArchive_BuildAttributesAcceleration_name = map[int32]string{
 	2: "kEaseOut",
 	3: "kEaseBoth",
 }
+
 var BuildAttributesArchive_BuildAttributesAcceleration_value = map[string]int32{
 	"kNone":     0,
 	"kEaseIn":   1,
@@ -172,9 +181,11 @@ func (x BuildAttributesArchive_BuildAttributesAcceleration) Enum() *BuildAttribu
 	*p = x
 	return p
 }
+
 func (x BuildAttributesArchive_BuildAttributesAcceleration) String() string {
 	return proto.EnumName(BuildAttributesArchive_BuildAttributesAcceleration_name, int32(x))
 }
+
 func (x *BuildAttributesArchive_BuildAttributesAcceleration) UnmarshalJSON(data []byte) error {
 	value, err := proto.UnmarshalJSONEnum(BuildAttributesArchive_BuildAttributesAcceleration_value, data, "BuildAttributesArchive_BuildAttributesAcceleration")
 	if err != nil {
@@ -195,6 +206,7 @@ var BuildAttributesArchive_BuildAttributesRotationDirection_name = map[int32]str
 	31: "kClockwise",
 	32: "kCounterclockwise",
 }
+
 var BuildAttributesArchive_BuildAttributesRotationDirection_value = map[string]int32{
 	"kClockwise":        31,
 	"kCounterclockwise": 32,
@@ -205,9 +217,11 @@ func (x BuildAttributesArchive_BuildAttributesRotationDirection) Enum() *BuildAt
 	*p = x
 	return p
 }
+
 func (x BuildAttributesArchive_BuildAttributesRotationDirection) String() string {
 	return proto.EnumName(BuildAttributesArchive_BuildAttributesRotationDirection_name, int32(x))
 }
+
 func (x *BuildAttributesArchive_BuildAttributesRotationDirection) UnmarshalJSON(data []byte) error {
 	value, err := proto.UnmarshalJSONEnum(BuildAttributesArchive_BuildAttributesRotationDirection_value, data, "BuildAttributesArchive_BuildAttributesRotationDirection")
 	if err != nil {
@@ -228,6 +242,7 @@ var BuildAttributesArchive_BuildAttributesCurveStyle_name = map[int32]string{
 	0: "kStraight",
 	1: "kCurved",
 }
+
 var BuildAttributesArchive_BuildAttributesCurveStyle_value = map[string]int32{
 	"kStraight": 0,
 	"kCurved":   1,
@@ -238,9 +253,11 @@ func (x BuildAttributesArchive_BuildAttributesCurveStyle) Enum() *BuildAttribute
 	*p = x
 	return p
 }
+
 func (x BuildAttributesArchive_BuildAttributesCurveStyle) String() string {
 	return proto.EnumName(BuildAttributesArchive_BuildAttributesCurveStyle_name, int32(x))
 }
+
 func (x *BuildAttributesArchive_BuildAttributesCurveStyle) UnmarshalJSON(data []byte) error {
 	value, err := proto.UnmarshalJSONEnum(BuildAttributesArchive_BuildAttributesCurveStyle_value, data, "BuildAttributesArchive_BuildAttributesCurveStyle")
 	if err != nil {
@@ -267,6 +284,7 @@ var BuildAttributesArchive_BuildAttributesTextDelivery_name = map[int32]string{
 	3: "kTextDeliveryByCharacter",
 	4: "kTextDeliveryByLine",
 }
+
 var BuildAttributesArchive_BuildAttributesTextDelivery_value = map[string]int32{
 	"kTextDeliveryUndefined":   0,
 	"kTextDeliveryByObject":    1,
@@ -280,9 +298,11 @@ func (x BuildAttributesArchive_BuildAttributesTextDelivery) Enum() *BuildAttribu
 	*p = x
 	return p
 }
+
 func (x BuildAttributesArchive_BuildAttributesTextDelivery) String() string {
 	return proto.EnumName(BuildAttributesArchive_BuildAttributesTextDelivery_name, int32(x))
 }
+
 func (x *BuildAttributesArchive_BuildAttributesTextDelivery) UnmarshalJSON(data []byte) error {
 	value, err := proto.UnmarshalJSONEnum(BuildAttributesArchive_BuildAttributesTextDelivery_value, data, "BuildAttributesArchive_BuildAttributesTextDelivery")
 	if err != nil {
@@ -311,6 +331,7 @@ var BuildAttributesArchive_BuildAttributesDeliveryOption_name = map[int32]string
 	4: "kDeliveryOptionFromEdges",
 	5: "kDeliveryOptionRandom",
 }
+
 var BuildAttributesArchive_BuildAttributesDeliveryOption_value = map[string]int32{
 	"kDeliveryOptionUndefined":  0,
 	"kDeliveryOptionForward":    1,
@@ -325,9 +346,11 @@ func (x BuildAttributesArchive_BuildAttributesDeliveryOption) Enum() *BuildAttri
 	*p = x
 	return p
 }
+
 func (x BuildAttributesArchive_BuildAttributesDeliveryOption) String() string {
 	return proto.EnumName(BuildAttributesArchive_BuildAttributesDeliveryOption_name, int32(x))
 }
+
 func (x *BuildAttributesArchive_BuildAttributesDeliveryOption) UnmarshalJSON(data []byte) error {
 	value, err := proto.UnmarshalJSONEnum(BuildAttributesArchive_BuildAttributesDeliveryOption_value, data, "BuildAttributesArchive_BuildAttributesDeliveryOption")
 	if err != nil {
@@ -350,6 +373,7 @@ var BuildAttributesArchive_ActionBuildAttributesJiggleIntensity_name = map[int32
 	1: "kJiggleIntensityMedium",
 	2: "kJiggleIntensityLarge",
 }
+
 var BuildAttributesArchive_ActionBuildAttributesJiggleIntensity_value = map[string]int32{
 	"kJiggleIntensitySmall":  0,
 	"kJiggleIntensityMedium": 1,
@@ -361,9 +385,11 @@ func (x BuildAttributesArchive_ActionBuildAttributesJiggleIntensity) Enum() *Bui
 	*p = x
 	return p
 }
+
 func (x BuildAttributesArchive_ActionBuildAttributesJiggleIntensity) String() string {
 	return proto.EnumName(BuildAttributesArchive_ActionBuildAttributesJiggleIntensity_name, int32(x))
 }
+
 func (x *BuildAttributesArchive_ActionBuildAttributesJiggleIntensity) UnmarshalJSON(data []byte) error {
 	value, err := proto.UnmarshalJSONEnum(BuildAttributesArchive_ActionBuildAttributesJiggleIntensity_value, data, "BuildAttributesArchive_ActionBuildAttributesJiggleIntensity")
 	if err != nil {
@@ -390,6 +416,7 @@ var PlaceholderArchive_Kind_name = map[int32]string{
 	3: "kKindBodyPlaceholder",
 	4: "kKindObjectPlaceholder",
 }
+
 var PlaceholderArchive_Kind_value = map[string]int32{
 	"kKindPlaceholder":            0,
 	"kKindSlideNumberPlaceholder": 1,
@@ -403,9 +430,11 @@ func (x PlaceholderArchive_Kind) Enum() *PlaceholderArchive_Kind {
 	*p = x
 	return p
 }
+
 func (x PlaceholderArchive_Kind) String() string {
 	return proto.EnumName(PlaceholderArchive_Kind_name, int32(x))
 }
+
 func (x *PlaceholderArchive_Kind) UnmarshalJSON(data []byte) error {
 	value, err := proto.UnmarshalJSONEnum(PlaceholderArchive_Kind_value, data, "PlaceholderArchive_Kind")
 	if err != nil {
@@ -426,6 +455,7 @@ var DesktopUILayoutArchive_SidebarViewMode_name = map[int32]string{
 	0: "kSidebarViewModeNavigator",
 	1: "kSidebarViewModeOutline",
 }
+
 var DesktopUILayoutArchive_SidebarViewMode_value = map[string]int32{
 	"kSidebarViewModeNavigator": 0,
 	"kSidebarViewModeOutline":   1,
@@ -436,9 +466,11 @@ func (x DesktopUILayoutArchive_SidebarViewMode) Enum() *DesktopUILayoutArchive_S
 	*p = x
 	return p
 }
+
 func (x DesktopUILayoutArchive_SidebarViewMode) String() string {
 	return proto.EnumName(DesktopUILayoutArchive_SidebarViewMode_name, int32(x))
 }
+
 func (x *DesktopUILayoutArchive_SidebarViewMode) UnmarshalJSON(data []byte) error {
 	value, err := proto.UnmarshalJSONEnum(DesktopUILayoutArchive_SidebarViewMode_value, data, "DesktopUILayoutArchive_SidebarViewMode")
 	if err != nil {
@@ -461,6 +493,7 @@ var DesktopUILayoutArchive_InspectorPaneViewMode_name = map[int32]string{
 	1: "kInspectorPaneViewModeAnimate",
 	2: "kInspectorPaneViewModeSetup",
 }
+
 var DesktopUILayoutArchive_InspectorPaneViewMode_value = map[string]int32{
 	"kInspectorPaneViewModeFormat":  0,
 	"kInspectorPaneViewModeAnimate": 1,
@@ -472,9 +505,11 @@ func (x DesktopUILayoutArchive_InspectorPaneViewMode) Enum() *DesktopUILayoutArc
 	*p = x
 	return p
 }
+
 func (x DesktopUILayoutArchive_InspectorPaneViewMode) String() string {
 	return proto.EnumName(DesktopUILayoutArchive_InspectorPaneViewMode_name, int32(x))
 }
+
 func (x *DesktopUILayoutArchive_InspectorPaneViewMode) UnmarshalJSON(data []byte) error {
 	value, err := proto.UnmarshalJSONEnum(DesktopUILayoutArchive_InspectorPaneViewMode_value, data, "DesktopUILayoutArchive_InspectorPaneViewMode")
 	if err != nil {
@@ -497,6 +532,7 @@ var ShowArchive_KNShowMode_name = map[int32]string{
 	1: "kKNShowModeAutoPlay",
 	2: "kKNShowModeHyperlinksOnly",
 }
+
 var ShowArchive_KNShowMode_value = map[string]int32{
 	"kKNShowModeNormal":         0,
 	"kKNShowModeAutoPlay":       1,
@@ -508,9 +544,11 @@ func (x ShowArchive_KNShowMode) Enum() *ShowArchive_KNShowMode {
 	*p = x
 	return p
 }
+
 func (x ShowArchive_KNShowMode) String() string {
 	return proto.EnumName(ShowArchive_KNShowMode_name, int32(x))
 }
+
 func (x *ShowArchive_KNShowMode) UnmarshalJSON(data []byte) error {
 	value, err := proto.UnmarshalJSONEnum(ShowArchive_KNShowMode_value, data, "ShowArchive_KNShowMode")
 	if err != nil {
@@ -531,6 +569,7 @@ var RecordingArchive_RecordingSyncState_name = map[int32]string{
 	0: "kRecordingSyncStateInSyncWithShow",
 	1: "kRecordingSyncStateOutOfSyncWithShow",
 }
+
 var RecordingArchive_RecordingSyncState_value = map[string]int32{
 	"kRecordingSyncStateInSyncWithShow":    0,
 	"kRecordingSyncStateOutOfSyncWithShow": 1,
@@ -541,9 +580,11 @@ func (x RecordingArchive_RecordingSyncState) Enum() *RecordingArchive_RecordingS
 	*p = x
 	return p
 }
+
 func (x RecordingArchive_RecordingSyncState) String() string {
 	return proto.EnumName(RecordingArchive_RecordingSyncState_name, int32(x))
 }
+
 func (x *RecordingArchive_RecordingSyncState) UnmarshalJSON(data []byte) error {
 	value, err := proto.UnmarshalJSONEnum(RecordingArchive_RecordingSyncState_value, data, "RecordingArchive_RecordingSyncState")
 	if err != nil {
@@ -566,6 +607,7 @@ var RecordingNavigationEventArchive_RecordingNavigationEventAnimationPhase_name 
 	1: "kRecordingNavigationEventAnimationStart",
 	2: "kRecordingNavigationEventAnimationEnd",
 }
+
 var RecordingNavigationEventArchive_RecordingNavigationEventAnimationPhase_value = map[string]int32{
 	"kRecordingNavigationEventAnimationNone":  0,
 	"kRecordingNavigationEventAnimationStart": 1,
@@ -577,9 +619,11 @@ func (x RecordingNavigationEventArchive_RecordingNavigationEventAnimationPhase) 
 	*p = x
 	return p
 }
+
 func (x RecordingNavigationEventArchive_RecordingNavigationEventAnimationPhase) String() string {
 	return proto.EnumName(RecordingNavigationEventArchive_RecordingNavigationEventAnimationPhase_name, int32(x))
 }
+
 func (x *RecordingNavigationEventArchive_RecordingNavigationEventAnimationPhase) UnmarshalJSON(data []byte) error {
 	value, err := proto.UnmarshalJSONEnum(RecordingNavigationEventArchive_RecordingNavigationEventAnimationPhase_value, data, "RecordingNavigationEventArchive_RecordingNavigationEventAnimationPhase")
 	if err != nil {
@@ -604,6 +648,7 @@ var RecordingPauseEventArchive_RecordingPauseEventType_name = map[int32]string{
 	2: "kRecordingPauseEventTypeConcealWithBlack",
 	3: "kRecordingPauseEventTypeConcealWithWhite",
 }
+
 var RecordingPauseEventArchive_RecordingPauseEventType_value = map[string]int32{
 	"kRecordingPauseEventTypeResume":           0,
 	"kRecordingPauseEventTypePause":            1,
@@ -616,9 +661,11 @@ func (x RecordingPauseEventArchive_RecordingPauseEventType) Enum() *RecordingPau
 	*p = x
 	return p
 }
+
 func (x RecordingPauseEventArchive_RecordingPauseEventType) String() string {
 	return proto.EnumName(RecordingPauseEventArchive_RecordingPauseEventType_name, int32(x))
 }
+
 func (x *RecordingPauseEventArchive_RecordingPauseEventType) UnmarshalJSON(data []byte) error {
 	value, err := proto.UnmarshalJSONEnum(RecordingPauseEventArchive_RecordingPauseEventType_value, data, "RecordingPauseEventArchive_RecordingPauseEventType")
 	if err != nil {
@@ -649,6 +696,7 @@ var RecordingMovieEventArchive_RecordingMovieEventType_name = map[int32]string{
 	5: "kRecordingMovieEventBeginScrubbing",
 	6: "kRecordingMovieEventEndScrubbing",
 }
+
 var RecordingMovieEventArchive_RecordingMovieEventType_value = map[string]int32{
 	"kRecordingMovieEventNone":           0,
 	"kRecordingMovieEventSeek":           1,
@@ -664,9 +712,11 @@ func (x RecordingMovieEventArchive_RecordingMovieEventType) Enum() *RecordingMov
 	*p = x
 	return p
 }
+
 func (x RecordingMovieEventArchive_RecordingMovieEventType) String() string {
 	return proto.EnumName(RecordingMovieEventArchive_RecordingMovieEventType_name, int32(x))
 }
+
 func (x *RecordingMovieEventArchive_RecordingMovieEventType) UnmarshalJSON(data []byte) error {
 	value, err := proto.UnmarshalJSONEnum(RecordingMovieEventArchive_RecordingMovieEventType_value, data, "RecordingMovieEventArchive_RecordingMovieEventType")
 	if err != nil {
@@ -689,6 +739,7 @@ var Soundtrack_SoundtrackMode_name = map[int32]string{
 	1: "kKNSoundtrackModeLoop",
 	2: "kKNSoundtrackModeDoNotPlay",
 }
+
 var Soundtrack_SoundtrackMode_value = map[string]int32{
 	"kKNSoundtrackModePlayOnce":  0,
 	"kKNSoundtrackModeLoop":      1,
@@ -700,9 +751,11 @@ func (x Soundtrack_SoundtrackMode) Enum() *Soundtrack_SoundtrackMode {
 	*p = x
 	return p
 }
+
 func (x Soundtrack_SoundtrackMode) String() string {
 	return proto.EnumName(Soundtrack_SoundtrackMode_name, int32(x))
 }
+
 func (x *Soundtrack_SoundtrackMode) UnmarshalJSON(data []byte) error {
 	value, err := proto.UnmarshalJSONEnum(Soundtrack_SoundtrackMode_value, data, "Soundtrack_SoundtrackMode")
 	if err != nil {
@@ -1842,8 +1895,10 @@ func (m *DesktopUILayoutArchive) Reset()         { *m = DesktopUILayoutArchive{}
 func (m *DesktopUILayoutArchive) String() string { return proto.CompactTextString(m) }
 func (*DesktopUILayoutArchive) ProtoMessage()    {}
 
-const Default_DesktopUILayoutArchive_InspectorPaneVisible bool = true
-const Default_DesktopUILayoutArchive_InspectorPaneViewMode DesktopUILayoutArchive_InspectorPaneViewMode = DesktopUILayoutArchive_kInspectorPaneViewModeFormat
+const (
+	Default_DesktopUILayoutArchive_InspectorPaneVisible  bool                                         = true
+	Default_DesktopUILayoutArchive_InspectorPaneViewMode DesktopUILayoutArchive_InspectorPaneViewMode = DesktopUILayoutArchive_kInspectorPaneViewModeFormat
+)
 
 func (m *DesktopUILayoutArchive) GetSidebarVisible() bool {
 	if m != nil && m.SidebarVisible != nil {
@@ -2206,10 +2261,12 @@ func (m *ShowArchive) Reset()         { *m = ShowArchive{} }
 func (m *ShowArchive) String() string { return proto.CompactTextString(m) }
 func (*ShowArchive) ProtoMessage()    {}
 
-const Default_ShowArchive_Mode ShowArchive_KNShowMode = ShowArchive_kKNShowModeNormal
-const Default_ShowArchive_AutoplayTransitionDelay float64 = 5
-const Default_ShowArchive_AutoplayBuildDelay float64 = 2
-const Default_ShowArchive_IdleTimerDelay float64 = 900
+const (
+	Default_ShowArchive_Mode                    ShowArchive_KNShowMode = ShowArchive_kKNShowModeNormal
+	Default_ShowArchive_AutoplayTransitionDelay float64                = 5
+	Default_ShowArchive_AutoplayBuildDelay      float64                = 2
+	Default_ShowArchive_IdleTimerDelay          float64                = 900
+)
 
 func (m *ShowArchive) GetUiState() *TSP.Reference {
 	if m != nil {
@@ -2941,6 +2998,7 @@ type SlideCollectionSelectionArchive_OutlineSelection struct {
 func (m *SlideCollectionSelectionArchive_OutlineSelection) Reset() {
 	*m = SlideCollectionSelectionArchive_OutlineSelection{}
 }
+
 func (m *SlideCollectionSelectionArchive_OutlineSelection) String() string {
 	return proto.CompactTextString(m)
 }

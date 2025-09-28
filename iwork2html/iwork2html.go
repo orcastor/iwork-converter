@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/binary"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -60,11 +59,15 @@ func E(tag string, children ...interface{}) *html.Node {
 }
 
 type Context struct {
-	styles map[string]string
-	imgs   map[string]uint64
-	ix     *index.Index
-	zr     *zip.ReadCloser
+	styles    map[string]string
+	imgs      map[string]uint64
+	ix        *index.Index
+	zr        *zip.ReadCloser
+	fontScale float64
 }
+
+// 控制是否输出表格单元格的调试日志
+var debugTableCells = false
 
 type Attachment struct {
 	pos  uint32
@@ -102,104 +105,604 @@ func popcount(v uint16) int {
 	return c
 }
 
-func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
-	stringTable := ctx.ix.Deref(tm.DataStore.StringTable).(*TST.TableDataList).Entries
-	richTable := ctx.ix.Deref(tm.DataStore.RichTextPayloadTable).(*TST.TableDataList).Entries
+// applyCellStyle 应用单元格样式
+func (ctx *Context) applyCellStyle(tm *TST.TableModelArchive, key uint32) string {
+	style := ""
 
-	// rc := *tm.NumberOfRows
-	cc := *tm.NumberOfColumns
-
-	// I found some hints at http://stingrayreader.sourceforge.net/workbook/numbers_13.html about how
-	// this works, but I'm still flying blind.
-
-	// so for now we assume at most one tile per row, and rows are in the right order.  I suspect long rows (more than
-	// 255 columns) will have multiple tiles, however.  This would likely only happen in a spreadsheet.
-
-	table := E("table")
-	for _, tinfo := range tm.DataStore.Tiles.Tiles {
-		tile := ctx.ix.Deref(tinfo.Tile).(*TST.Tile)
-		for r, rinfo := range tile.RowInfos {
-			tr := E("tr")
-			table.AppendChild(tr)
-
-			offsets := make([]uint16, len(rinfo.CellOffsets)/2)
-			binary.Read(bytes.NewBuffer(rinfo.CellOffsets), LE, offsets)
-			// Naïvely assuming that the index is the column number, per the stringrayreader code.
-			// FIXME - figure out the right way to determine column number.
-			for c, offset := range offsets {
-				if uint32(c) >= cc {
+	if tm.DataStore != nil && tm.DataStore.StyleTable != nil {
+		if tdl, ok := ctx.ix.Deref(tm.DataStore.StyleTable).(*TST.TableDataList); ok {
+			for _, entry := range tdl.Entries {
+				if *entry.Key == key && entry.Reference != nil {
+					if csa, ok := ctx.ix.Deref(entry.Reference).(*TST.CellStyleArchive); ok {
+						if csa.CellProperties != nil {
+							// 处理背景填充
+							if csa.CellProperties.CellFill != nil {
+								if css := colorToCSS(csa.CellProperties.CellFill.GetColor()); css != "" {
+									applyBackgroundColor(&style, css, true)
+								}
+							}
+							// 处理边框和圆角
+							processCellBorders(&style, csa.CellProperties)
+							// 处理字体大小
+							processCellFont(&style, csa.CellProperties)
+						}
+					} else if psa, ok := ctx.ix.Deref(entry.Reference).(*TSWP.ParagraphStyleArchive); ok {
+						// 处理段落样式作为单元格样式
+						if psa.ParaProperties != nil {
+							// 处理段落背景填充
+							if psa.ParaProperties.Fill != nil {
+								if css := colorToCSS(psa.ParaProperties.Fill); css != "" {
+									applyBackgroundColor(&style, css, false)
+								}
+							}
+							// 处理段落边框
+							if psa.ParaProperties.Stroke != nil {
+								col := colorToCSS(psa.ParaProperties.Stroke.Color)
+								w := 1.0
+								if psa.ParaProperties.Stroke.Width != nil {
+									w = float64(*psa.ParaProperties.Stroke.Width)
+								}
+								if col != "" {
+									style += fmt.Sprintf("border: %.2fpx solid %s; box-sizing: border-box;", w, col)
+								}
+							}
+						}
+					}
 					break
 				}
-				td := E("td")
-				tr.AppendChild(td)
+			}
+		}
+	}
 
-				// 0xffff is an empty cell (This only occurs at the end in my sample document.)
-				if offset == 65535 {
+	return style
+}
+
+// applyBackgroundColor 统一处理背景色应用
+func applyBackgroundColor(style *string, css string, important bool) {
+	if css == "" {
+		return
+	}
+
+	*style += "background:" + css
+	if important {
+		*style += " !important"
+	}
+	*style += ";"
+
+	if strings.HasPrefix(css, "rgba(") || strings.HasPrefix(css, "rgb(") || strings.HasPrefix(css, "#") {
+		*style += "background-color:" + css
+		if important {
+			*style += " !important"
+		}
+		*style += ";"
+	}
+}
+
+// mergeParentStyles 递归处理父样式继承
+func (ctx *Context) mergeParentStyles(child, parent *TSWP.ParagraphStyleArchive) {
+	if parent.Super.Parent != nil {
+		grandParent := ctx.ix.Deref(parent.Super.Parent).(*TSWP.ParagraphStyleArchive)
+		// 先处理祖辈样式到父样式
+		mergeCharProps(parent.CharProperties, grandParent.CharProperties)
+		mergeParaProps(parent.ParaProperties, grandParent.ParaProperties)
+		// 递归处理更深层的继承
+		ctx.mergeParentStyles(parent, grandParent)
+		// 然后将处理后的父样式应用到子样式
+		mergeCharProps(child.CharProperties, parent.CharProperties)
+		mergeParaProps(child.ParaProperties, parent.ParaProperties)
+	}
+}
+
+// mergeParentCharStyles 递归处理父字符样式继承
+func (ctx *Context) mergeParentCharStyles(child, parent *TSWP.CharacterStyleArchive) {
+	if parent.Super.Parent != nil {
+		grandParent := ctx.ix.Deref(parent.Super.Parent).(*TSWP.CharacterStyleArchive)
+		// 先处理祖辈样式到父样式
+		mergeCharProps(parent.CharProperties, grandParent.CharProperties)
+		// 递归处理更深层的继承
+		ctx.mergeParentCharStyles(parent, grandParent)
+		// 然后将处理后的父样式应用到子样式
+		mergeCharProps(child.CharProperties, parent.CharProperties)
+	}
+}
+
+// applyPositionBasedStyle 根据单元格位置应用样式
+func (ctx *Context) applyPositionBasedStyle(tm *TST.TableModelArchive, globalRow, c int) string {
+	style := ""
+
+	// 检查单元格位置类型
+	var cellStyleRef *TSP.Reference
+	var isHeaderRow, isHeaderColumn, isFooterRow bool
+
+	// 检查是否为表头行
+	if tm.NumberOfHeaderRows != nil && globalRow < int(*tm.NumberOfHeaderRows) {
+		isHeaderRow = true
+	}
+	// 检查是否为表头列
+	if tm.NumberOfHeaderColumns != nil && c < int(*tm.NumberOfHeaderColumns) {
+		isHeaderColumn = true
+	}
+	// 检查是否为表尾行
+	if tm.NumberOfFooterRows != nil && tm.NumberOfRows != nil && globalRow >= int(*tm.NumberOfRows-*tm.NumberOfFooterRows) {
+		isFooterRow = true
+	}
+
+	// 优先级：表头行 > 表头列 > 表尾行 > 默认
+	if isHeaderRow && tm.HeaderRowStyle != nil {
+		cellStyleRef = tm.HeaderRowStyle
+	} else if isHeaderColumn && tm.HeaderColumnStyle != nil {
+		cellStyleRef = tm.HeaderColumnStyle
+	} else if isFooterRow && tm.FooterRowStyle != nil {
+		cellStyleRef = tm.FooterRowStyle
+	} else if tm.BodyCellStyle != nil {
+		cellStyleRef = tm.BodyCellStyle
+	}
+
+	// 应用选中的样式
+	if cellStyleRef != nil {
+		if csp, ok := ctx.ix.Deref(cellStyleRef).(*TST.CellStylePropertiesArchive); ok {
+			// 处理背景填充
+			if csp.CellFill != nil {
+				if css := colorToCSS(csp.CellFill.GetColor()); css != "" {
+					applyBackgroundColor(&style, css, true)
+				}
+			}
+			// 处理边框
+			processCellBorders(&style, csp)
+		}
+	}
+
+	return style
+}
+
+func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
+	rows := uint32(0)
+	cols := uint32(0)
+	if tm.NumberOfRows != nil {
+		rows = *tm.NumberOfRows
+	}
+	if tm.NumberOfColumns != nil {
+		cols = *tm.NumberOfColumns
+	}
+	if debugTableCells {
+		fmt.Printf("DEBUG: Processing table with %d rows, %d columns (pointers: %p, %p)\n", rows, cols, tm.NumberOfRows, tm.NumberOfColumns)
+	}
+	// 提取字符串和富文本表
+	var stringTable []*TST.TableDataList_ListEntry
+	var richTable []*TST.TableDataList_ListEntry
+	if tm.DataStore != nil {
+		if debugTableCells {
+			fmt.Printf("DEBUG: DataStore found\n")
+		}
+		if tm.DataStore.StringTable != nil {
+			if debugTableCells {
+				fmt.Printf("DEBUG: StringTable reference found\n")
+			}
+			if tdl, ok := ctx.ix.Deref(tm.DataStore.StringTable).(*TST.TableDataList); ok {
+				stringTable = tdl.Entries
+				if debugTableCells {
+					fmt.Printf("DEBUG: StringTable loaded with %d entries\n", len(stringTable))
+					for i, entry := range stringTable {
+						if i < 5 { // 只显示前5个条目
+							fmt.Printf("DEBUG: StringTable[%d]: key=%d, value=%s\n", i, *entry.Key, *entry.String_)
+						}
+					}
+				}
+			} else {
+				if debugTableCells {
+					fmt.Printf("DEBUG: Failed to deref StringTable\n")
+				}
+			}
+		} else {
+			if debugTableCells {
+				fmt.Printf("DEBUG: No StringTable reference\n")
+			}
+		}
+		if tm.DataStore.RichTextPayloadTable != nil {
+			if debugTableCells {
+				fmt.Printf("DEBUG: RichTextPayloadTable reference found\n")
+			}
+			if tdl, ok := ctx.ix.Deref(tm.DataStore.RichTextPayloadTable).(*TST.TableDataList); ok {
+				richTable = tdl.Entries
+				if debugTableCells {
+					fmt.Printf("DEBUG: RichTextPayloadTable loaded with %d entries\n", len(richTable))
+					for i, entry := range richTable {
+						if i < 5 { // 只显示前5个条目
+							fmt.Printf("DEBUG: RichTextTable[%d]: key=%d\n", i, *entry.Key)
+							if entry.RichTextPayload != nil {
+								if storage, ok := ctx.ix.Deref(entry.RichTextPayload).(*TSWP.StorageArchive); ok {
+									if len(storage.Text) > 0 {
+										fmt.Printf("DEBUG: RichTextTable[%d] content: %s\n", i, storage.Text[0])
+									} else {
+										fmt.Printf("DEBUG: RichTextTable[%d] has no text\n", i)
+									}
+								}
+							}
+						}
+					}
+				}
+			} else {
+				if debugTableCells {
+					fmt.Printf("DEBUG: Failed to deref RichTextPayloadTable\n")
+				}
+			}
+		} else {
+			if debugTableCells {
+				fmt.Printf("DEBUG: No RichTextPayloadTable reference\n")
+			}
+		}
+	} else {
+		if debugTableCells {
+			fmt.Printf("DEBUG: No DataStore found\n")
+		}
+	}
+
+	cc := int(*tm.NumberOfColumns)
+
+	// 扫描所有单元格，找出有内容的列（通过正确解析 RowInfo/CellStorage）
+	activeColumns := make([]bool, cc)
+	hasAnyContent := false
+	for _, tinfo := range tm.DataStore.Tiles.Tiles {
+		tile := ctx.ix.Deref(tinfo.Tile).(*TST.Tile)
+		for _, rinfo := range tile.RowInfos {
+			// 解码该行的 column -> offset 映射
+			offsets := make([]uint16, len(rinfo.CellOffsets)/2)
+			binary.Read(bytes.NewBuffer(rinfo.CellOffsets), LE, offsets)
+			for c := 0; c < cc && c < len(offsets); c++ {
+				offset := offsets[c]
+				if offset == 65535 { // 空单元格
 					continue
 				}
-
+				// 解析单元格类型
 				var cellType int
-				// this has changed since I first wrote the code.  There is now a 4 in the first byte and the type in the next
-				// the "stingrayreader" site says there is a halfword "version" and then the type, which I think worked at one
-				// point, but I no longer have the file.
 				if rinfo.CellStorageBuffer[offset] == 4 {
 					cellType = int(rinfo.CellStorageBuffer[offset+1])
 				} else {
 					cellType = int(rinfo.CellStorageBuffer[offset+2])
 				}
+				// 有内容的类型：数字/日期/布尔/字符串/富文本
+				if cellType == 0 {
+					// 即使是空单元格，也标记该列为活跃，因为它有结构
+					activeColumns[c] = true
+					continue
+				}
+				activeColumns[c] = true
+				hasAnyContent = true
+			}
+		}
+	}
 
-				// As far as I can tell, the records are variable length, with the pointer into the string/rich table at
-				// the end, but this field seems to contain one bit per uint32 before the pointer to the string table
-				// I suspect they are flags indicating which numbers/fields follow.
+	// 如果没有任何内容但有列定义，则激活所有列
+	if !hasAnyContent && cc > 0 {
+		for i := 0; i < cc; i++ {
+			activeColumns[i] = true
+		}
+	}
+
+	// 计算有内容的列数
+	activeColumnCount := 0
+	for _, active := range activeColumns {
+		if active {
+			activeColumnCount++
+		}
+	}
+
+	table := E("table")
+	// 只为有内容的列生成列定义
+	if activeColumnCount > 0 {
+		colgroup := E("colgroup")
+		w := 100.0 / float64(activeColumnCount)
+		for i := 0; i < cc; i++ {
+			if activeColumns[i] {
+				col := E("col", []string{"style", fmt.Sprintf("width: %.6f%%;", w)})
+				colgroup.AppendChild(col)
+			}
+		}
+		table.AppendChild(colgroup)
+	}
+
+	// 构造 thead/tbody，将表头行放入 thead
+	thead := E("thead")
+	tbody := E("tbody")
+	table.AppendChild(thead)
+	table.AppendChild(tbody)
+
+	// 使用全局行号跨 tile 判断表头/表尾，并正确解析/填充每个单元格
+	globalRow := 0
+	for _, tinfo := range tm.DataStore.Tiles.Tiles {
+		tile := ctx.ix.Deref(tinfo.Tile).(*TST.Tile)
+		for _, rinfo := range tile.RowInfos {
+			tr := E("tr")
+			// 表头行依据全局行号判断
+			isHeaderRow := tm.NumberOfHeaderRows != nil && globalRow < int(*tm.NumberOfHeaderRows)
+			if isHeaderRow {
+				thead.AppendChild(tr)
+			} else {
+				tbody.AppendChild(tr)
+			}
+
+			// 解码该行的 column -> offset 映射
+			offsets := make([]uint16, len(rinfo.CellOffsets)/2)
+			binary.Read(bytes.NewBuffer(rinfo.CellOffsets), LE, offsets)
+
+			for c := 0; c < cc; c++ {
+				if !activeColumns[c] {
+					continue
+				}
+
+				// 检查是否为表头单元格
+				var cellTag string
+				if isHeaderRow {
+					cellTag = "th"
+				} else {
+					cellTag = "td"
+				}
+
+				td := E(cellTag)
+				// 添加调试属性
+				td.Attr = append(td.Attr, html.Attribute{Key: "data-row", Val: fmt.Sprintf("%d", globalRow)})
+				td.Attr = append(td.Attr, html.Attribute{Key: "data-col", Val: fmt.Sprintf("%d", c)})
+				tr.AppendChild(td)
+
+				// 应用基于位置的样式（表头/表尾/表体）
+				if s := ctx.applyPositionBasedStyle(tm, globalRow, c); s != "" {
+					td.Attr = append(td.Attr, html.Attribute{Key: "style", Val: s})
+				}
+
+				// 如果该列没有 offset，视为无内容
+				if c >= len(offsets) {
+					continue
+				}
+				offset := offsets[c]
+				if offset == 65535 { // 空单元格
+					continue
+				}
+
+				// 解析单元格类型和定位到数据/指针
+				var cellType int
+				if rinfo.CellStorageBuffer[offset] == 4 {
+					cellType = int(rinfo.CellStorageBuffer[offset+1])
+				} else {
+					cellType = int(rinfo.CellStorageBuffer[offset+2])
+				}
+				if debugTableCells {
+					fmt.Printf("DEBUG: Cell at row %d, col %d: offset=%d, buffer[offset]=%d, buffer[offset+1]=%d, buffer[offset+2]=%d, cellType=%d\n",
+						globalRow, c, offset, rinfo.CellStorageBuffer[offset], rinfo.CellStorageBuffer[offset+1], rinfo.CellStorageBuffer[offset+2], cellType)
+				}
+
+				// 如果cellType为0但我们知道有内容，尝试强制处理
+				if cellType == 0 {
+					if debugTableCells {
+						fmt.Printf("DEBUG: Attempting to force process cell at row %d, col %d\n", globalRow, c)
+					}
+				}
+
 				flags := LE.Uint16(rinfo.CellStorageBuffer[offset+4 : offset+6])
 				o := popcount(flags)*4 + 8 + int(offset)
+				if debugTableCells {
+					fmt.Printf("DEBUG: Cell flags=%x, popcount=%d, o=%d\n", flags, popcount(flags), o)
+				}
 
-				key := LE.Uint32(rinfo.CellStorageBuffer[o : o+4])
-
-				// fmt.Printf("P %d %x %d %x\n", cellType, flags, popcount(flags), rinfo.CellStorageBuffer[o:o+4])
-				// version := LE.Uint16(rinfo.CellStorageBuffer[offset : offset+2])
-				// fmt.Println("XXX", c, version, cellType, hex.EncodeToString(rinfo.CellStorageBuffer[offset:]))
 				switch cellType {
 				case 0:
-					// blank cells are type 0
-				case 2: // number
-					value := math.Float64frombits(LE.Uint64(rinfo.CellStorageBuffer[o : o+8]))
-					td.AppendChild(E("p", fmt.Sprint(value)))
-				case 5: // date
-					value := math.Float64frombits(LE.Uint64(rinfo.CellStorageBuffer[o : o+8]))
-					value += 978307200 // Apple to unix epoch
-					tm := time.Unix(int64(value), 0)
-					// We'll probably want to figure out formatting here.
-					td.AppendChild(E("p", fmt.Sprint(tm)))
-				case 6: // boolean
-					value := math.Float64frombits(LE.Uint64(rinfo.CellStorageBuffer[o : o+8]))
-					label := "???"
-					if value == 0 {
-						label = "FALSE"
-					} else if value == 0xf03f {
-						label = "TRUE"
+					// 空白单元格：仅尝试原始键读取，避免启发式回填导致重复内容
+					if debugTableCells {
+						fmt.Printf("DEBUG: Empty cell at row %d, col %d - try original key only\n", globalRow, c)
 					}
-					td.AppendChild(E("p", label))
-				case 3:
-					for _, entry := range stringTable {
-						if *entry.Key == key {
-							td.AppendChild(E("p", *entry.String_))
+
+					// 尝试在不同位置读取键值，找到有效的内容
+					found := false
+					var key uint32
+					
+					// 尝试多个可能的键值位置
+					keyPositions := []int{0, 4, 8, int(offset), int(offset)+4, int(offset)+8}
+					for _, pos := range keyPositions {
+						if pos+4 <= len(rinfo.CellStorageBuffer) {
+							testKey := LE.Uint32(rinfo.CellStorageBuffer[pos : pos+4])
+							if debugTableCells {
+								fmt.Printf("DEBUG: Testing key at position %d: %d\n", pos, testKey)
+							}
+							
+							// 检查这个键是否在 stringTable 或 richTable 中存在
+							// 同时尝试键值偏移（可能有偏移量）
+							keyExists := false
+							actualKey := testKey
+							offsets := []uint32{0, 1, 2, 3} // 尝试不同的偏移
+							
+							for _, offset := range offsets {
+								if testKey >= offset {
+									tryKey := testKey - offset
+									for _, entry := range stringTable {
+										if *entry.Key == tryKey {
+											keyExists = true
+											actualKey = tryKey
+											if debugTableCells {
+												fmt.Printf("DEBUG: Found string match with offset %d: buffer_key=%d -> table_key=%d\n", offset, testKey, tryKey)
+											}
+											break
+										}
+									}
+									if !keyExists {
+										for _, entry := range richTable {
+											if *entry.Key == tryKey {
+												keyExists = true
+												actualKey = tryKey
+												if debugTableCells {
+													fmt.Printf("DEBUG: Found rich text match with offset %d: buffer_key=%d -> table_key=%d\n", offset, testKey, tryKey)
+												}
+												break
+											}
+										}
+									}
+									if keyExists {
+										break
+									}
+								}
+							}
+							
+							if keyExists {
+								key = actualKey
+								if debugTableCells {
+									fmt.Printf("DEBUG: Found valid key %d at position %d (original buffer key: %d)\n", actualKey, pos, testKey)
+								}
+								break
+							}
 						}
 					}
-				case 9:
+					
+					if key > 0 {
+						// 字符串表
+						for _, entry := range stringTable {
+							if *entry.Key == key {
+								td.AppendChild(T(*entry.String_))
+								found = true
+								if debugTableCells {
+									fmt.Printf("DEBUG: Empty cell resolved via string key %d: %s\n", key, *entry.String_)
+								}
+								break
+							}
+						}
+						// 富文本表
+						if !found {
+							for _, entry := range richTable {
+								if *entry.Key == key {
+									if rt, ok := ctx.ix.Deref(entry.RichTextPayload).(*TST.RichTextPayloadArchive); ok {
+										if st, ok := ctx.ix.Deref(rt.Storage).(*TSWP.StorageArchive); ok && st != nil {
+											ctx.storageToNodeForTable(st, td)
+											found = true
+											if debugTableCells {
+												fmt.Printf("DEBUG: Empty cell resolved via rich text key %d\n", key)
+											}
+										}
+									}
+									break
+								}
+							}
+						}
+						if !found && debugTableCells {
+							fmt.Printf("DEBUG: Empty cell unresolved, key %d not found\n", key)
+						}
+					} else if debugTableCells {
+						fmt.Printf("DEBUG: Empty cell has no valid key found\n")
+					}
+				case 2: // number
+					value := math.Float64frombits(LE.Uint64(rinfo.CellStorageBuffer[o : o+8]))
+					td.AppendChild(T(fmt.Sprint(value)))
+				case 5: // date
+					value := math.Float64frombits(LE.Uint64(rinfo.CellStorageBuffer[o : o+8]))
+					value += 978307200 // Apple epoch to unix epoch
+					tmv := time.Unix(int64(value), 0)
+					td.AppendChild(T(fmt.Sprint(tmv)))
+				case 6: // boolean
+					// 以非零位判断 TRUE/FALSE，避免 0xf03f 比较导致误判
+					bits := LE.Uint64(rinfo.CellStorageBuffer[o : o+8])
+					label := "FALSE"
+					if bits != 0 {
+						label = "TRUE"
+					}
+					td.AppendChild(T(label))
+				case 3: // string
+					key := LE.Uint32(rinfo.CellStorageBuffer[o : o+4])
+					if debugTableCells {
+						fmt.Printf("DEBUG: String cell at row %d, col %d, key: %d\n", globalRow, c, key)
+					}
+					found := false
+					for _, entry := range stringTable {
+						if *entry.Key == key {
+							if debugTableCells {
+								fmt.Printf("DEBUG: Found string: %s\n", *entry.String_)
+							}
+							td.AppendChild(T(*entry.String_))
+							found = true
+							break
+						}
+					}
+					if !found {
+						if debugTableCells {
+							fmt.Printf("DEBUG: String key %d not found in stringTable\n", key)
+						}
+					}
+				case 9: // rich text
+					key := LE.Uint32(rinfo.CellStorageBuffer[o : o+4])
+					if debugTableCells {
+						fmt.Printf("DEBUG: Rich text cell at row %d, col %d, key: %d\n", globalRow, c, key)
+					}
+					found := false
 					for _, entry := range richTable {
 						if *entry.Key == key {
-							rt := ctx.ix.Deref(entry.RichTextPayload).(*TST.RichTextPayloadArchive)
-							st := ctx.ix.Deref(rt.Storage).(*TSWP.StorageArchive)
-							ctx.storageToNode(st, td)
+							if debugTableCells {
+								fmt.Printf("DEBUG: Found rich text entry\n")
+							}
+							if rt, ok := ctx.ix.Deref(entry.RichTextPayload).(*TST.RichTextPayloadArchive); ok {
+								if st, ok := ctx.ix.Deref(rt.Storage).(*TSWP.StorageArchive); ok && st != nil {
+									if debugTableCells {
+										fmt.Printf("DEBUG: Processing rich text storage: %s\n", st.Text)
+									}
+									ctx.storageToNodeForTable(st, td)
+									found = true
+								}
+							}
+							break
+						}
+					}
+					if !found {
+						if debugTableCells {
+							fmt.Printf("DEBUG: Rich text key %d not found in richTable\n", key)
 						}
 					}
 				default:
-					fmt.Printf("P %d %x %d %x\n", cellType, flags, popcount(flags), rinfo.CellStorageBuffer[o:o+8])
-					fmt.Printf("CELL %d:%d type %d %s\n", r, c, cellType, hex.EncodeToString(rinfo.CellStorageBuffer[offset:]))
-					td.AppendChild(E("p", fmt.Sprintf("UNKNOWN CELL TYPE %d", cellType)))
+					// 处理未知的单元格类型 - 添加严格验证防止重复内容
+					if o+4 <= len(rinfo.CellStorageBuffer) {
+						key := LE.Uint32(rinfo.CellStorageBuffer[o : o+4])
+						if debugTableCells {
+							fmt.Printf("DEBUG: Unknown cell type %d at row %d, col %d, key: %d\n", cellType, globalRow, c, key)
+						}
+
+						// 只有当键值非零且合理时才尝试查找内容
+						if key > 0 && key < 0xFFFFFFFF {
+							found := false
+							// 首先尝试在字符串表中查找
+							for _, entry := range stringTable {
+								if *entry.Key == key {
+									td.AppendChild(T(*entry.String_))
+									found = true
+									if debugTableCells {
+										fmt.Printf("DEBUG: Found string content for unknown type %d: %s\n", cellType, *entry.String_)
+									}
+									break
+								}
+							}
+
+							// 如果在字符串表中没找到，尝试富文本表
+							if !found {
+								for _, entry := range richTable {
+									if *entry.Key == key {
+										if rt, ok := ctx.ix.Deref(entry.RichTextPayload).(*TST.RichTextPayloadArchive); ok {
+											if st, ok := ctx.ix.Deref(rt.Storage).(*TSWP.StorageArchive); ok && st != nil {
+												ctx.storageToNodeForTable(st, td)
+												found = true
+												if debugTableCells {
+													fmt.Printf("DEBUG: Found rich text content for unknown type %d\n", cellType)
+												}
+											}
+										}
+										break
+									}
+								}
+							}
+
+							if !found && debugTableCells {
+								fmt.Printf("DEBUG: No content found for unknown type %d, key=%d\n", cellType, key)
+							}
+						} else if debugTableCells {
+							fmt.Printf("DEBUG: Invalid key %d for unknown type %d, skipping\n", key, cellType)
+						}
+					} else if debugTableCells {
+						fmt.Printf("DEBUG: Unknown cell type %d has no room for key read (o=%d, len=%d)\n", cellType, o, len(rinfo.CellStorageBuffer))
+					}
 				}
 			}
+			globalRow++
 		}
 	}
 	rval := E("div")
@@ -214,7 +717,41 @@ func (ctx *Context) processDrawable(ref *TSP.Reference) *html.Node {
 	item := ctx.ix.Deref(ref)
 	switch item.(type) {
 	case *TSD.ImageArchive:
-		return ctx.processImage(item.(*TSD.ImageArchive))
+		img := item.(*TSD.ImageArchive)
+		node := ctx.processImage(img)
+		if img.Super != nil && img.Super.Geometry != nil {
+			// Detect full-page background image by geometry ≈ canvas
+			canvasW := 1920.0
+			canvasH := 1080.0
+			for _, rec := range ctx.ix.Records {
+				if sh, ok := rec.(*KN.ShowArchive); ok {
+					if sh.Size != nil && sh.Size.Width != nil && sh.Size.Height != nil {
+						canvasW = float64(*sh.Size.Width)
+						canvasH = float64(*sh.Size.Height)
+					}
+					break
+				}
+			}
+			isFull := false
+			if g := img.Super.Geometry; g != nil && g.Position != nil && g.Size != nil &&
+				g.Position.X != nil && g.Position.Y != nil && g.Size.Width != nil && g.Size.Height != nil {
+				x := float64(*g.Position.X)
+				y := float64(*g.Position.Y)
+				w := float64(*g.Size.Width)
+				h := float64(*g.Size.Height)
+				if math.Abs(x) < 1e-2 && math.Abs(y) < 1e-2 &&
+					math.Abs(w-canvasW) < 1e-1 && math.Abs(h-canvasH) < 1e-1 {
+					isFull = true
+				}
+			}
+			if isFull {
+				// Mark as slide background image
+				node.Attr = append(node.Attr, html.Attribute{Key: "class", Val: "background-img"})
+				return node
+			}
+			return ctx.wrapWithGeometry(node, img.Super.Geometry, "")
+		}
+		return node
 	case *TST.WPTableInfoArchive:
 		table := item.(*TST.WPTableInfoArchive)
 		tm := ctx.ix.Deref(table.Super.TableModel).(*TST.TableModelArchive)
@@ -223,7 +760,131 @@ func (ctx *Context) processDrawable(ref *TSP.Reference) *html.Node {
 		tm := ctx.ix.Deref(item.(*TST.TableInfoArchive).TableModel).(*TST.TableModelArchive)
 		return ctx.processTable(tm)
 	case *TSWP.ShapeInfoArchive:
-		return ctx.processShapeInfo(item.(*TSWP.ShapeInfoArchive))
+		sia := item.(*TSWP.ShapeInfoArchive)
+		node := ctx.processShapeInfo(sia)
+		fillCSS := ""
+		strokeCSS := ""
+		if sia.Super != nil && sia.Super.Style != nil {
+			styleAny := ctx.ix.Deref(sia.Super.Style)
+			if ss, ok := styleAny.(*TSD.ShapeStyleArchive); ok {
+				if ss.ShapeProperties != nil && ss.ShapeProperties.Fill != nil {
+					if css := colorToCSS(ss.ShapeProperties.Fill.GetColor()); css != "" {
+						fillCSS = css
+					} else if g := ss.ShapeProperties.Fill.Gradient; g != nil {
+						// simple linear-gradient from first->last stop
+						stops := g.GetStops()
+						if len(stops) >= 2 {
+							c1 := colorToCSS(stops[0].GetColor())
+							c2 := colorToCSS(stops[len(stops)-1].GetColor())
+							if c1 != "" && c2 != "" {
+								fillCSS = fmt.Sprintf("linear-gradient(%s, %s)", c1, c2)
+							}
+						}
+					} else if img := ss.ShapeProperties.Fill.Image; img != nil && img.Imagedata != nil && img.Imagedata.Identifier != nil {
+						// mark to receive background image later on wrapper
+						ctx.imgs[fmt.Sprintf("Data/%d", *img.Imagedata.Identifier)] = *img.Imagedata.Identifier
+						fillCSS = fmt.Sprintf("url(#bgimg_%d)", *img.Imagedata.Identifier)
+					}
+				}
+				if ss.ShapeProperties != nil && ss.ShapeProperties.Stroke != nil {
+					if col := colorToCSS(ss.ShapeProperties.Stroke.Color); col != "" {
+						w := 1.0
+						if ss.ShapeProperties.Stroke.Width != nil {
+							w = float64(*ss.ShapeProperties.Stroke.Width)
+						}
+						strokeCSS = fmt.Sprintf("border: %.2fpx solid %s; box-sizing: border-box;", w, col)
+
+						// 检查是否有圆角
+						if ss.ShapeProperties.Stroke.Join != nil && *ss.ShapeProperties.Stroke.Join == TSD.LineJoin_RoundJoin {
+							strokeCSS += "border-radius: 4px;"
+						}
+					}
+				}
+			} else if swp, ok := styleAny.(*TSWP.ShapeStyleArchive); ok {
+				if swp.GetSuper() != nil && swp.GetSuper().ShapeProperties != nil && swp.GetSuper().ShapeProperties.Fill != nil {
+					if css := colorToCSS(swp.GetSuper().ShapeProperties.Fill.GetColor()); css != "" {
+						fillCSS = css
+					}
+				}
+				if sps := swp.GetSuper().ShapeProperties; sps != nil && sps.Stroke != nil {
+					if col := colorToCSS(sps.Stroke.Color); col != "" {
+						w := 1.0
+						if sps.Stroke.Width != nil {
+							w = float64(*sps.Stroke.Width)
+						}
+						strokeCSS = fmt.Sprintf("border: %.2fpx solid %s; box-sizing: border-box;", w, col)
+
+						// 检查是否有圆角
+						if sps.Stroke.Join != nil && *sps.Stroke.Join == TSD.LineJoin_RoundJoin {
+							strokeCSS += "border-radius: 4px;"
+						}
+					}
+				}
+			}
+		}
+		// Pages 文本框有时通过段落样式提供填充/描边
+		if fillCSS == "" || strokeCSS == "" {
+			if sia.ContainedStorage != nil {
+				if stor, ok := ctx.ix.Deref(sia.ContainedStorage).(*TSWP.StorageArchive); ok && stor.TableParaStyle != nil && len(stor.TableParaStyle.Entries) > 0 {
+					if stor.TableParaStyle.Entries[0].Object != nil {
+						if psa, ok := ctx.ix.Deref(stor.TableParaStyle.Entries[0].Object).(*TSWP.ParagraphStyleArchive); ok && psa.ParaProperties != nil {
+							if fillCSS == "" && psa.ParaProperties.Fill != nil {
+								if css := colorToCSS(psa.ParaProperties.Fill); css != "" {
+									fillCSS = css
+								}
+							}
+							if strokeCSS == "" && psa.ParaProperties.Stroke != nil {
+								col := colorToCSS(psa.ParaProperties.Stroke.Color)
+								w := 1.0
+								if psa.ParaProperties.Stroke.Width != nil {
+									w = float64(*psa.ParaProperties.Stroke.Width)
+								}
+								if col != "" {
+									strokeCSS = fmt.Sprintf("border: %.2fpx solid %s; box-sizing: border-box;", w, col)
+								}
+							}
+						}
+					}
+					// 兜底：若依然没有填充，尝试首个字符样式背景色作为文本框背景
+					if fillCSS == "" && stor.TableCharStyle != nil && len(stor.TableCharStyle.Entries) > 0 {
+						if stor.TableCharStyle.Entries[0].Object != nil {
+							if csa, ok := ctx.ix.Deref(stor.TableCharStyle.Entries[0].Object).(*TSWP.CharacterStyleArchive); ok && csa.CharProperties != nil {
+								if bc := csa.CharProperties.GetBackgroundColor(); bc != nil {
+									if css := colorToCSS(bc); css != "" {
+										fillCSS = css
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+		if sia.Super != nil && sia.Super.Super != nil && sia.Super.Super.Geometry != nil {
+			extra := ""
+			var bgClass string
+			if fillCSS != "" {
+				if strings.HasPrefix(fillCSS, "url(#bgimg_") {
+					bgClass = "bgimg_" + strings.TrimSuffix(strings.TrimPrefix(fillCSS, "url(#bgimg_"), ")")
+					extra += "background-size:cover;background-position:center;"
+				} else {
+					// 同时设置 background 与 background-color，避免某些浏览器合成异常
+					extra += "background:" + fillCSS + ";"
+					if strings.HasPrefix(fillCSS, "rgba(") || strings.HasPrefix(fillCSS, "rgb(") || strings.HasPrefix(fillCSS, "#") {
+						extra += "background-color:" + fillCSS + ";"
+					}
+				}
+			}
+			if strokeCSS != "" {
+				extra += strokeCSS
+			}
+			wrapper := ctx.wrapWithGeometry(node, sia.Super.Super.Geometry, extra)
+			if bgClass != "" {
+				wrapper.Attr = append(wrapper.Attr, html.Attribute{Key: "class", Val: bgClass})
+			}
+			return wrapper
+		}
+		return node
 	case *TSD.GroupArchive:
 		return ctx.processDrawableArchive(item.(*TSD.GroupArchive).Super)
 	case *KN.PlaceholderArchive:
@@ -237,30 +898,196 @@ func (ctx *Context) processDrawable(ref *TSP.Reference) *html.Node {
 }
 
 func (ctx *Context) processShapeInfo(sia *TSWP.ShapeInfoArchive) *html.Node {
+	fmt.Printf("DEBUG: Processing ShapeInfo\n")
 	if cs := ctx.ix.Deref(sia.ContainedStorage).(*TSWP.StorageArchive); cs != nil {
+		fmt.Printf("DEBUG: Found ContainedStorage with text: %s\n", cs.Text)
 		div := E("div")
 		if ctx.storageToNode(cs, div) == nil {
 			return div
 		}
+	} else {
+		fmt.Printf("DEBUG: No ContainedStorage found in ShapeInfo\n")
 	}
 	return ctx.processDrawableArchive(sia.Super.Super)
 }
 
 func (ctx *Context) processDrawableArchive(da *TSD.DrawableArchive) *html.Node {
-	// do nothing...
+	if da == nil {
+		return nil
+	}
+
+	// 处理可绘制对象的几何信息
+	if da.Geometry != nil {
+		// 创建基本的可绘制元素容器
+		container := E("div", []string{"class", "drawable-archive"})
+
+		// DrawableArchive 没有直接的样式字段，样式通过其他方式处理
+
+		// 应用几何样式
+		return ctx.wrapWithGeometry(container, da.Geometry, "")
+	}
+
 	return nil
+}
+
+// processNumberAttachment 处理数字附件
+func (ctx *Context) processNumberAttachment(na *TSWP.NumberAttachmentArchive) *html.Node {
+	if na.Super == nil {
+		return nil
+	}
+
+	// 创建数字显示元素
+	numberNode := E("span", []string{"class", "number-attachment"})
+
+	// 如果有字符串值，显示它
+	if na.StringValue != nil {
+		numberNode.AppendChild(T(*na.StringValue))
+	} else {
+		numberNode.AppendChild(T("0"))
+	}
+
+	return numberNode
+}
+
+// wrapWithGeometry wraps a child node with an absolutely positioned container based on TSD.GeometryArchive.
+// extraStyle can include any CSS declarations, e.g. "background:rgba(...);border:1px solid red; display:flex;"
+func (ctx *Context) wrapWithGeometry(child *html.Node, geom *TSD.GeometryArchive, extraStyle string) *html.Node {
+	if geom == nil || geom.Position == nil || geom.Size == nil {
+		return child
+	}
+
+	// Determine target CSS size and canvas size for scaling
+	var targetWidthCSS float64
+	var canvasW float64
+	var canvasH float64
+	if ctx.ix.Type == "key" {
+		targetWidthCSS = 1200.0
+		canvasW = 1920.0
+		canvasH = 1080.0
+		for _, rec := range ctx.ix.Records {
+			if sh, ok := rec.(*KN.ShowArchive); ok {
+				if sh.Size != nil && sh.Size.Width != nil && sh.Size.Height != nil {
+					canvasW = float64(*sh.Size.Width)
+					canvasH = float64(*sh.Size.Height)
+				}
+				break
+			}
+		}
+	} else {
+		// Pages: approximate A4 points (72dpi): 595 x 842
+		targetWidthCSS = 900.0
+		canvasW = 595.0
+		canvasH = 842.0
+	}
+	slideHeightCSS := targetWidthCSS * canvasH / canvasW
+
+	sx := targetWidthCSS / canvasW
+	sy := slideHeightCSS / canvasH
+
+	x := float64(0)
+	y := float64(0)
+	w := float64(0)
+	h := float64(0)
+	angle := float64(0)
+	if geom.Position.X != nil {
+		x = float64(*geom.Position.X) * sx
+	}
+	if geom.Position.Y != nil {
+		y = float64(*geom.Position.Y) * sy
+	}
+	if geom.Size.Width != nil {
+		w = float64(*geom.Size.Width) * sx
+	}
+	if geom.Size.Height != nil {
+		h = float64(*geom.Size.Height) * sy
+	}
+	if geom.Angle != nil {
+		angle = float64(*geom.Angle)
+	}
+
+	style := fmt.Sprintf("position:absolute; left:%.2fpx; top:%.2fpx; width:%.2fpx; height:%.2fpx;", x, y, w, h)
+	if angle != 0 {
+		style += fmt.Sprintf(" transform: rotate(%.6frad); transform-origin: 0 0;", angle)
+	}
+	if extraStyle != "" {
+		if !strings.HasSuffix(extraStyle, ";") {
+			extraStyle += ";"
+		}
+		style += " " + extraStyle
+	}
+
+	wrapper := E("div", []string{"style", style, "class", "geom"})
+	if child != nil {
+		if child.Type == html.ElementNode && child.Data == "img" {
+			// Make placed images scale to the geometry box while preserving aspect
+			// Inline style to override any width/height attributes
+			child.Attr = append(child.Attr, html.Attribute{Key: "style", Val: "width:100%;height:100%;object-fit:contain;display:block;"})
+		}
+		wrapper.AppendChild(child)
+	}
+	return wrapper
+}
+
+// colorToCSS converts TSP.Color to CSS rgba() string.
+func colorToCSS(c *TSP.Color) string {
+	if c == nil {
+		return ""
+	}
+	// Prefer RGB model
+	r := float64(0)
+	g := float64(0)
+	b := float64(0)
+	a := float64(1)
+	if c.R != nil {
+		r = float64(*c.R)
+	}
+	if c.G != nil {
+		g = float64(*c.G)
+	}
+	if c.B != nil {
+		b = float64(*c.B)
+	}
+	if c.A != nil {
+		a = float64(*c.A)
+	}
+	// Clamp 0..1 then convert to 0..255
+	clamp := func(v float64) float64 {
+		if v < 0 {
+			return 0
+		}
+		if v > 1 {
+			return 1
+		}
+		return v
+	}
+	r255 := clamp(r) * 255
+	g255 := clamp(g) * 255
+	b255 := clamp(b) * 255
+	return fmt.Sprintf("rgba(%d,%d,%d,%.3f)", int(r255+0.5), int(g255+0.5), int(b255+0.5), clamp(a))
 }
 
 // storageToNode populates a html node with the contents of a StorageArchive. This happens with both the
 // main body of the document and rich text table cells.
-func (ctx *Context) storageToNode(bs *TSWP.StorageArchive, body *html.Node) error {
-	ix := ctx.ix
+// storageToNodeForTable 处理表格单元格内容，不创建段落元素
+func (ctx *Context) storageToNodeForTable(bs *TSWP.StorageArchive, td *html.Node) error {
 	texts := bs.Text
 
-	if len(texts) != 1 {
-		return fmt.Errorf("FIXME - Expecting exactly one text, got %d", len(texts))
+	if len(texts) == 0 {
+		// 添加一个空的占位符，确保单元格有内容
+		td.AppendChild(E("span", "&nbsp;"))
+		return nil
 	}
-	text := texts[0]
+
+	// 处理多个文本片段
+	var text string
+	if len(texts) == 1 {
+		text = texts[0]
+	} else {
+		// 合并多个文本片段
+		for _, t := range texts {
+			text += t
+		}
+	}
 
 	// Offsets are in terms of unicode runes, so we have to convert to runes
 	rr := []rune(text)
@@ -280,7 +1107,313 @@ func (ctx *Context) storageToNode(bs *TSWP.StorageArchive, body *html.Node) erro
 					attachments = append(attachments, Attachment{pos, node})
 				}
 			case *TSWP.NumberAttachmentArchive:
-				// do nothing...
+				archive := ctx.ix.Deref(entry.Object).(*TSWP.NumberAttachmentArchive)
+				node := ctx.processNumberAttachment(archive)
+				if node != nil {
+					attachments = append(attachments, Attachment{pos, node})
+				}
+			}
+		}
+	}
+	// bs.TableListStyle - seems to change on headings, look into it.
+
+	// build content without paragraphs
+	if len(parStyles) == 0 {
+		// 如果没有段落样式，直接添加文本内容
+		td.AppendChild(T(text))
+		return nil
+	}
+
+	for i, e := range parStyles {
+		pos := *e.CharacterIndex
+		end := uint32(len(rr))
+		if i+1 < len(parStyles) {
+			end = *parStyles[i+1].CharacterIndex
+		}
+
+		// 直接渲染段落内容，避免在渲染段前插入同一文本片段造成重复
+		// 附件暂时不内嵌到段落文本中，以避免重复文本；后续可优化为按位置插入
+		paragraphNode := ctx.processTableCellParagraph(rr[pos:end], e, bs, pos, end)
+		td.AppendChild(paragraphNode)
+
+		// 段落渲染后，如果有位于该段落范围内的附件，附加到单元格中（非内联）
+		for len(attachments) > 0 && attachments[0].pos < end {
+			td.AppendChild(attachments[0].node)
+			attachments = attachments[1:]
+		}
+	}
+
+	return nil
+}
+
+// processTableCellParagraph 处理表格单元格中的段落内容，保持格式但简化结构
+func (ctx *Context) processTableCellParagraph(text []rune, paraStyle *TSWP.ObjectAttributeTable_ObjectAttribute, bs *TSWP.StorageArchive, globalStart uint32, globalEnd uint32) *html.Node {
+	// 创建容器元素
+	container := E("div")
+
+	// 获取段落样式
+	var psa *TSWP.ParagraphStyleArchive
+	if paraStyle.Object != nil {
+		psa = ctx.ix.Deref(paraStyle.Object).(*TSWP.ParagraphStyleArchive)
+	}
+
+	// 应用段落样式到容器
+	if psa != nil {
+		className := fmt.Sprintf("ps%d", *paraStyle.Object.Identifier)
+		container.Attr = append(container.Attr, html.Attribute{Key: "class", Val: className})
+
+		// 应用段落样式
+		if psa.ParaProperties != nil {
+			style := translateParaProps(ctx.ix, psa.ParaProperties)
+			if style != "" {
+				container.Attr = append(container.Attr, html.Attribute{Key: "style", Val: style})
+			}
+		}
+	}
+
+	// 处理字符样式 - 段内逐区间输出（不做智能合并）
+	if bs.TableCharStyle != nil {
+		// 段内条目，映射到局部索引
+		var charStyles []*TSWP.ObjectAttributeTable_ObjectAttribute
+		for _, entry := range bs.TableCharStyle.Entries {
+			if entry.CharacterIndex == nil {
+				continue
+			}
+			ci := *entry.CharacterIndex
+			if ci < globalStart || ci >= globalEnd {
+				continue
+			}
+			ne := *entry
+			local := ci - globalStart
+			ne.CharacterIndex = &local
+			charStyles = append(charStyles, &ne)
+		}
+
+		// 保证字符样式按位置递增排序，避免区间计算错乱导致重复文本
+		if len(charStyles) > 1 {
+			for i := 0; i < len(charStyles)-1; i++ {
+				for j := i + 1; j < len(charStyles); j++ {
+					if *charStyles[i].CharacterIndex > *charStyles[j].CharacterIndex {
+						charStyles[i], charStyles[j] = charStyles[j], charStyles[i]
+					}
+				}
+			}
+		}
+
+		var pos uint32 = 0
+		endLocal := uint32(len(text))
+		for i, e := range charStyles {
+			cs := *e.CharacterIndex
+			if cs < pos {
+				continue
+			}
+			if cs >= endLocal {
+				break
+			}
+
+			ce := endLocal
+			if i+1 < len(charStyles) {
+				ce = *charStyles[i+1].CharacterIndex
+			}
+			if ce > endLocal {
+				ce = endLocal
+			}
+			if cs > pos {
+				container.AppendChild(T(string(text[pos:cs])))
+				pos = cs
+			}
+
+			if e.Object != nil {
+				if ref, ok := ctx.ix.Deref(e.Object).(*TSWP.CharacterStyleArchive); ok {
+					key := fmt.Sprintf("ss%d", *e.Object.Identifier)
+
+					if ref.Super.Parent != nil {
+						parent := ctx.ix.Deref(ref.Super.Parent).(*TSWP.CharacterStyleArchive)
+						mergeCharProps(ref.CharProperties, parent.CharProperties)
+					}
+
+					style := translateCharProps(ref.CharProperties)
+
+					props := ref.CharProperties
+					if props != nil && props.Bold != nil && *props.Bold &&
+						(props.Italic == nil || !*props.Italic) &&
+						props.FontSize == nil && props.FontName == nil {
+						container.AppendChild(E("b", string(text[cs:ce])))
+					} else if props != nil && props.Italic != nil && *props.Italic &&
+						(props.Bold == nil || !*props.Bold) &&
+						props.FontSize == nil && props.FontName == nil {
+						container.AppendChild(E("em", string(text[cs:ce])))
+					} else if style != "" {
+						ctx.styles[key] = style
+						container.AppendChild(E("span", []string{"class", key}, string(text[cs:ce])))
+					} else {
+						container.AppendChild(T(string(text[cs:ce])))
+					}
+				} else {
+					container.AppendChild(T(string(text[cs:ce])))
+				}
+			} else {
+				container.AppendChild(T(string(text[cs:ce])))
+			}
+			pos = ce
+		}
+		if pos < endLocal {
+			container.AppendChild(T(string(text[pos:endLocal])))
+		}
+	} else {
+		container.AppendChild(T(string(text)))
+	}
+
+	return container
+}
+
+// processTableCellText 处理表格单元格中的文本和字符样式
+func (ctx *Context) processTableCellText(text []rune, paraStyle *TSWP.ParagraphStyleArchive, bs *TSWP.StorageArchive) *html.Node {
+	// 创建容器元素
+	container := E("span")
+
+	// 处理字符样式
+	if bs.TableCharStyle != nil {
+		charStyles := bs.TableCharStyle.Entries
+		pos := 0
+
+		// 改进的字符样式处理逻辑
+		// 先按位置排序字符样式条目
+		sortedStyles := make([]struct {
+			index uint32
+			entry *TSWP.ObjectAttributeTable_ObjectAttribute
+		}, len(charStyles))
+
+		for i, e := range charStyles {
+			sortedStyles[i] = struct {
+				index uint32
+				entry *TSWP.ObjectAttributeTable_ObjectAttribute
+			}{*e.CharacterIndex, e}
+		}
+
+		// 按位置排序
+		for i := 0; i < len(sortedStyles)-1; i++ {
+			for j := i + 1; j < len(sortedStyles); j++ {
+				if sortedStyles[i].index > sortedStyles[j].index {
+					sortedStyles[i], sortedStyles[j] = sortedStyles[j], sortedStyles[i]
+				}
+			}
+		}
+
+		// 处理排序后的样式
+		for i, styleEntry := range sortedStyles {
+			cs := styleEntry.index
+			if cs < uint32(pos) {
+				continue
+			}
+			if cs >= uint32(len(text)) {
+				break
+			}
+
+			// 计算当前样式的结束位置
+			ce := uint32(len(text)) // 默认到文本结束
+
+			// 查找下一个样式的位置
+			for j := i + 1; j < len(sortedStyles); j++ {
+				nextCs := sortedStyles[j].index
+				if nextCs > cs {
+					ce = nextCs
+					break
+				}
+			}
+
+			// 确保 ce 不超过文本长度
+			if ce > uint32(len(text)) {
+				ce = uint32(len(text))
+			}
+
+			// 添加之前的文本（没有样式的部分）
+			if cs > uint32(pos) {
+				container.AppendChild(T(string(text[pos:cs])))
+			}
+
+			// 处理当前字符样式
+			if styleEntry.entry.Object != nil {
+				if csa, ok := ctx.ix.Deref(styleEntry.entry.Object).(*TSWP.CharacterStyleArchive); ok {
+					span := E("span")
+
+					// 应用字符样式
+					if csa.CharProperties != nil {
+						style := translateCharProps(csa.CharProperties)
+						if style != "" {
+							span.Attr = append(span.Attr, html.Attribute{Key: "style", Val: style})
+						}
+					}
+
+					// 添加文本内容
+					span.AppendChild(T(string(text[cs:ce])))
+					container.AppendChild(span)
+				} else {
+					// 如果没有字符样式，直接添加文本
+					container.AppendChild(T(string(text[cs:ce])))
+				}
+			} else {
+				// 如果没有字符样式，直接添加文本
+				container.AppendChild(T(string(text[cs:ce])))
+			}
+
+			pos = int(ce)
+		}
+
+		// 添加剩余的文本
+		if pos < len(text) {
+			container.AppendChild(T(string(text[pos:])))
+		}
+	} else {
+		// 没有字符样式，直接添加文本
+		container.AppendChild(T(string(text)))
+	}
+
+	return container
+}
+
+func (ctx *Context) storageToNode(bs *TSWP.StorageArchive, body *html.Node) error {
+	ix := ctx.ix
+	texts := bs.Text
+
+	if len(texts) == 0 {
+		return fmt.Errorf("no text content found")
+	}
+
+	// 处理多个文本片段
+	var text string
+	if len(texts) == 1 {
+		text = texts[0]
+	} else {
+		// 合并多个文本片段
+		for _, t := range texts {
+			text += t
+		}
+	}
+
+	// Offsets are in terms of unicode runes, so we have to convert to runes
+	rr := []rune(text)
+
+	// <p>
+	parStyles := bs.TableParaStyle.Entries
+
+	var attachments []Attachment
+	if bs.TableAttachment != nil {
+		for _, entry := range bs.TableAttachment.Entries {
+			pos := *entry.CharacterIndex
+			switch ctx.ix.Deref(entry.Object).(type) {
+			case *TSWP.DrawableAttachmentArchive:
+				archive := ctx.ix.Deref(entry.Object).(*TSWP.DrawableAttachmentArchive)
+				node := ctx.processDrawable(archive.Drawable)
+				if node != nil {
+					attachments = append(attachments, Attachment{pos, node})
+				}
+			case *TSWP.NumberAttachmentArchive:
+				archive := ctx.ix.Deref(entry.Object).(*TSWP.NumberAttachmentArchive)
+				node := ctx.processNumberAttachment(archive)
+				if node != nil {
+					attachments = append(attachments, Attachment{pos, node})
+				}
 			}
 		}
 	}
@@ -288,6 +1421,10 @@ func (ctx *Context) storageToNode(bs *TSWP.StorageArchive, body *html.Node) erro
 
 	// A null style seems to imply "use the previous class," so this is declared outside the loop.
 	var className string
+
+	// 列表状态跟踪
+	var currentList *html.Node
+	var currentListType string
 
 	// build paragraphs
 	for i, e := range parStyles {
@@ -299,9 +1436,12 @@ func (ctx *Context) storageToNode(bs *TSWP.StorageArchive, body *html.Node) erro
 		}
 
 		for len(attachments) > 0 && attachments[0].pos < end {
+			// 处理附件位置：如果附件不在段落开始，在段落开始处插入占位符
 			if attachments[0].pos != pos {
-				fmt.Printf("FIXME - attachment not at start of paragraph - pstart=%d pend=%d att=%d par=%#v\n",
-					pos, end, attachments[0].pos, string(rr[pos:end]))
+				// 在段落开始和附件位置之间插入文本
+				if attachments[0].pos > pos {
+					body.AppendChild(T(string(rr[pos:attachments[0].pos])))
+				}
 			}
 			body.AppendChild(attachments[0].node)
 			attachments = attachments[1:]
@@ -314,6 +1454,11 @@ func (ctx *Context) storageToNode(bs *TSWP.StorageArchive, body *html.Node) erro
 			ref := ix.Deref(e.Object).(*TSWP.ParagraphStyleArchive)
 			className = fmt.Sprintf("ps%d", *e.Object.Identifier)
 
+			// Pages: insert a page-break marker before this paragraph when requested by style
+			if ctx.ix.Type == "pages" && ref.ParaProperties != nil && ref.ParaProperties.GetPageBreakBefore() {
+				body.AppendChild(E("hr", []string{"class", "page-break"}))
+			}
+
 			// Some properties are inherited (e.g. if you apply a style and then tweak it.)
 			// We can't just include both because FirstLineIndent in parent can combine with LeftIndent in child
 			// to produce a css text-indent.
@@ -322,12 +1467,11 @@ func (ctx *Context) storageToNode(bs *TSWP.StorageArchive, body *html.Node) erro
 				mergeCharProps(ref.CharProperties, parent.CharProperties)
 				mergeParaProps(ref.ParaProperties, parent.ParaProperties)
 
-				if parent.Super.Parent != nil {
-					// TODO: Need recursion here
-				}
+				// 递归处理父样式的继承
+				ctx.mergeParentStyles(ref, parent)
 			}
 
-			ctx.styles[className] = translateParaProps(ref.ParaProperties) + translateCharProps(ref.CharProperties)
+			ctx.styles[className] = translateParaProps(ctx.ix, ref.ParaProperties) + translateCharProps(ref.CharProperties)
 
 			if ref.ParaProperties.OutlineLevel != nil {
 				level := *ref.ParaProperties.OutlineLevel
@@ -337,11 +1481,80 @@ func (ctx *Context) storageToNode(bs *TSWP.StorageArchive, body *html.Node) erro
 			}
 		}
 
-		p := E(tag, []string{"class", className})
-		// <span> <em> and <b>
+		// 检查是否是列表项
+		var isListItem bool
+		var listType string
+		if e.Object != nil {
+			ref := ix.Deref(e.Object).(*TSWP.ParagraphStyleArchive)
+			if ref.ParaProperties != nil && (ref.ParaProperties.ListStyleNull == nil || !*ref.ParaProperties.ListStyleNull) && ref.ParaProperties.ListStyle != nil {
+				// Only treat as list item when ListStyle has label types; otherwise keep as normal paragraph
+				if ls, ok := ix.Deref(ref.ParaProperties.ListStyle).(*TSWP.ListStyleArchive); ok {
+					if len(ls.LabelTypes) > 0 {
+						isListItem = true
+						labelType := ls.LabelTypes[0]
+						switch labelType {
+						case TSWP.ListStyleArchive_kNumber:
+							listType = "ol"
+						case TSWP.ListStyleArchive_kString, TSWP.ListStyleArchive_kImage:
+							listType = "ul"
+						default:
+							listType = "ul"
+						}
+					}
+				}
+			}
+		}
+
+		// Skip empty list items: if paragraph is list-styled but content is empty, do not render
+		if isListItem {
+			if strings.TrimSpace(string(rr[pos:end])) == "" {
+				continue
+			}
+		}
+
+		// 处理列表项
+		var p *html.Node
+		if isListItem {
+			// 检查是否需要创建新的列表容器
+			if currentList == nil || currentListType != listType {
+				// 关闭当前列表（如果有）
+				if currentList != nil {
+					body.AppendChild(currentList)
+				}
+
+				// 创建新列表
+				currentList = E(listType)
+				currentListType = listType
+			}
+
+			// 创建列表项
+			p = E("li", []string{"class", className})
+			// 应用列表样式
+			if e.Object != nil {
+				ref := ix.Deref(e.Object).(*TSWP.ParagraphStyleArchive)
+				if ref.ParaProperties != nil && ref.ParaProperties.ListStyle != nil {
+					listCSS := translateListStyle(ix, ref.ParaProperties.ListStyle)
+					if listCSS != "" {
+						p.Attr = append(p.Attr, html.Attribute{Key: "style", Val: listCSS})
+					}
+				}
+			}
+		} else {
+			// 非列表项，关闭当前列表（如果有）
+			if currentList != nil {
+				body.AppendChild(currentList)
+				currentList = nil
+				currentListType = ""
+			}
+			p = E(tag, []string{"class", className})
+		}
+
+		// <span> <em> and <b> - 段落内字符样式处理
 		if bs.TableCharStyle != nil {
 			charStyles := bs.TableCharStyle.Entries
-			for i, e := range charStyles { // build any span/em/b as needed
+
+			// 只处理当前段落范围内的字符样式
+			for i, e := range charStyles {
 				cs := *e.CharacterIndex
 				if cs < pos {
 					continue
@@ -349,20 +1562,24 @@ func (ctx *Context) storageToNode(bs *TSWP.StorageArchive, body *html.Node) erro
 				if cs >= end {
 					break
 				}
+
+				// 计算当前样式的结束位置
 				ce := uint32(len(rr))
 				if i+1 < len(charStyles) {
 					ce = *charStyles[i+1].CharacterIndex
 				}
+				// 限制在当前段落范围内
 				if ce > end {
-					if e.Object != nil {
-						fmt.Println("ERR? ce > end", ce, end, e.Object)
-					}
 					ce = end
 				}
+
+				// 添加样式前的文本
 				if cs > pos {
 					p.AppendChild(T(string(rr[pos:cs])))
 					pos = cs
 				}
+
+				// 应用字符样式
 				if e.Object != nil {
 					ref := ix.Deref(e.Object).(*TSWP.CharacterStyleArchive)
 					key := fmt.Sprintf("ss%d", *e.Object.Identifier)
@@ -370,22 +1587,35 @@ func (ctx *Context) storageToNode(bs *TSWP.StorageArchive, body *html.Node) erro
 					if ref.Super.Parent != nil {
 						parent := ix.Deref(ref.Super.Parent).(*TSWP.CharacterStyleArchive)
 						mergeCharProps(ref.CharProperties, parent.CharProperties)
-						if parent.Super.Parent != nil {
-							// TODO: Need recursion here
-						}
+						// 递归处理父样式的继承
+						ctx.mergeParentCharStyles(ref, parent)
 					}
 
 					style := translateCharProps(ref.CharProperties)
 
-					// convert em/bold to tags
-					switch style {
-					case "  font-style: italic;\n":
-						p.AppendChild(E("em", string(rr[cs:ce])))
-					case "  font-weight: bold;\n":
-						p.AppendChild(E("b", string(rr[cs:ce])))
-					default:
-						ctx.styles[key] = style
-						p.AppendChild(E("span", []string{"class", key}, string(rr[cs:ce])))
+					// 检查具体的样式属性来决定使用什么标签
+					props := ref.CharProperties
+					if props != nil {
+						// 检查是否只有粗体
+						if props.Bold != nil && *props.Bold &&
+							(props.Italic == nil || !*props.Italic) &&
+							props.FontSize == nil && props.FontName == nil {
+							p.AppendChild(E("b", string(rr[cs:ce])))
+						} else if props.Italic != nil && *props.Italic &&
+							(props.Bold == nil || !*props.Bold) &&
+							props.FontSize == nil && props.FontName == nil {
+							p.AppendChild(E("em", string(rr[cs:ce])))
+						} else if style != "" {
+							// 有复杂样式，使用span
+							ctx.styles[key] = style
+							p.AppendChild(E("span", []string{"class", key}, string(rr[cs:ce])))
+						} else {
+							// 没有样式，直接添加文本
+							p.AppendChild(T(string(rr[cs:ce])))
+						}
+					} else {
+						// 没有样式属性，直接添加文本
+						p.AppendChild(T(string(rr[cs:ce])))
 					}
 				} else {
 					p.AppendChild(T(string(rr[cs:ce])))
@@ -394,8 +1624,21 @@ func (ctx *Context) storageToNode(bs *TSWP.StorageArchive, body *html.Node) erro
 			}
 		}
 		p.AppendChild(T(string(rr[pos:end])))
-		body.AppendChild(p)
+
+		// 处理列表项
+		if isListItem {
+			// 将列表项添加到当前列表
+			currentList.AppendChild(p)
+		} else {
+			// 添加普通段落
+			body.AppendChild(p)
+		}
 		body.AppendChild(T("\n"))
+	}
+
+	// 处理可能剩余的列表
+	if currentList != nil {
+		body.AppendChild(currentList)
 	}
 
 	return nil
@@ -421,6 +1664,7 @@ func Convert(in, out string) error {
 	fmt.Println("Read", len(ctx.ix.Records), "records")
 
 	var doc *html.Node
+	// set global for font scaling hook
 	switch ctx.ix.Type {
 	case "pages":
 		doc = ctx.processPages()
@@ -463,6 +1707,7 @@ func (ctx *Context) renderImgData() *html.Node {
 
 			imageBytes, _ := io.ReadAll(rc)
 			s += "document.querySelectorAll('.img_" + fmt.Sprint(id) + "').forEach(function(e) {e.src='data:image/" + filepath.Ext(f.Name)[1:] + ";base64," + base64.StdEncoding.EncodeToString(imageBytes) + "';});"
+			s += "document.querySelectorAll('.bgimg_" + fmt.Sprint(id) + "').forEach(function(e) {e.style.backgroundImage='url(data:image/" + filepath.Ext(f.Name)[1:] + ";base64," + base64.StdEncoding.EncodeToString(imageBytes) + ")'; e.style.backgroundSize='cover'; e.style.backgroundPosition='center';});"
 		}
 	}
 
@@ -493,14 +1738,282 @@ func (ctx *Context) processPages() *html.Node {
 `)
 	}
 
-	ctx.storageToNode(bs, body)
+	// Render into a temporary container to post-process page breaks
+	temp := E("div")
+	// Pages 字体与画布单位一致，若存在页面尺寸，可在此处设置字体缩放
+	// 对于 Pages 文档，不使用字体缩放
+	ctx.fontScale = 1.0 // 不使用字体缩放，保持原始字体大小
+	fmt.Printf("*** 设置字体缩放因子: %.2f\n", ctx.fontScale)
+	ctx.storageToNode(bs, temp)
+
+	// Split content by hr.page-break into pages
+	container := E("div", []string{"class", "page-container"})
+	page := E("div", []string{"class", "page"})
+	for n := temp.FirstChild; n != nil; {
+		next := n.NextSibling
+		isBreak := false
+		if n.Type == html.ElementNode && n.Data == "hr" {
+			for _, a := range n.Attr {
+				if a.Key == "class" && a.Val == "page-break" {
+					isBreak = true
+					break
+				}
+			}
+		}
+		// Detach from temp before reparenting/moving
+		temp.RemoveChild(n)
+		if isBreak {
+			container.AppendChild(page)
+			page = E("div", []string{"class", "page"})
+		} else {
+			page.AppendChild(n)
+		}
+		n = next
+	}
+	container.AppendChild(page)
+
+	// Place floating drawables per page
+	if da != nil {
+		if fdaRef := da.FloatingDrawables; fdaRef != nil {
+			if fda, ok := ctx.ix.Deref(fdaRef).(*TP.FloatingDrawablesArchive); ok {
+				// Ensure there are enough page nodes for all indices
+				maxIdx := -1
+				for _, pg := range fda.GetPageGroups() {
+					if int(pg.GetPageIndex()) > maxIdx {
+						maxIdx = int(pg.GetPageIndex())
+					}
+				}
+				// Count existing pages
+				existing := 0
+				for n := container.FirstChild; n != nil; n = n.NextSibling {
+					if n.Type == html.ElementNode && n.Data == "div" {
+						existing++
+					}
+				}
+				for existing <= maxIdx {
+					container.AppendChild(E("div", []string{"class", "page"}))
+					existing++
+				}
+
+				// Build slice of page nodes for index lookup
+				pages := []*html.Node{}
+				for n := container.FirstChild; n != nil; n = n.NextSibling {
+					if n.Type == html.ElementNode && n.Data == "div" {
+						pages = append(pages, n)
+					}
+				}
+				for _, pg := range fda.GetPageGroups() {
+					idx := int(pg.GetPageIndex())
+					if idx >= 0 && idx < len(pages) {
+						host := pages[idx]
+						// add drawables
+						add := func(entries []*TP.FloatingDrawablesArchive_DrawableEntry) {
+							for _, de := range entries {
+								if de == nil || de.GetDrawable() == nil {
+									continue
+								}
+								if node := ctx.processDrawable(de.GetDrawable()); node != nil {
+									host.AppendChild(node)
+								}
+							}
+						}
+						add(pg.GetBackgroundDrawables())
+						add(pg.GetDrawables())
+						add(pg.GetForegroundDrawables())
+					}
+				}
+			}
+		}
+	}
+
+	body.AppendChild(container)
+
+	paginate := E("script")
+	paginate.AppendChild(T(
+		"document.addEventListener('DOMContentLoaded', function() {\n" +
+			"  var container = document.querySelector('.page-container');\n" +
+			"  if (!container) return;\n" +
+			"  var pages = Array.from(container.querySelectorAll('.page'));\n" +
+			"  if (pages.length === 0) return;\n" +
+			"  var firstPage = pages[0];\n" +
+			"  function getUsableHeight(el){\n" +
+			"    var cs = getComputedStyle(el);\n" +
+			"    var pt = parseFloat(cs.paddingTop)||0; var pb = parseFloat(cs.paddingBottom)||0;\n" +
+			"    return el.clientHeight - pt - pb;\n" +
+			"  }\n" +
+			"  function getTableHeight(table) {\n" +
+			"    var tempDiv = document.createElement('div');\n" +
+			"    tempDiv.style.position = 'absolute';\n" +
+			"    tempDiv.style.visibility = 'hidden';\n" +
+			"    tempDiv.style.width = table.offsetWidth + 'px';\n" +
+			"    tempDiv.style.top = '-9999px';\n" +
+			"    tempDiv.style.left = '-9999px';\n" +
+			"    tempDiv.appendChild(table.cloneNode(true));\n" +
+			"    document.body.appendChild(tempDiv);\n" +
+			"    var height = tempDiv.offsetHeight;\n" +
+			"    document.body.removeChild(tempDiv);\n" +
+			"    return height;\n" +
+			"  }\n" +
+			"  function isElementOverflowing(element) {\n" +
+			"    return element.scrollHeight > element.clientHeight;\n" +
+			"  }\n" +
+			"  function isLikelyTextBox(n){\n" +
+			"    if (!(n instanceof HTMLElement)) return false;\n" +
+			"    var hasNonText = n.querySelector('table,img,canvas,svg,video,figure') != null;\n" +
+			"    if (hasNonText) return false;\n" +
+			"    var textLen = (n.textContent||'').trim().length;\n" +
+			"    if (textLen === 0) return false;\n" +
+			"    return true;\n" +
+			"  }\n" +
+			"  var flow = [];\n" +
+			"  pages.forEach(function(page){\n" +
+			"    Array.from(page.childNodes).forEach(function(n){\n" +
+			"      if (!(n instanceof HTMLElement)) return;\n" +
+			"      if (n.tagName === 'HR' && n.classList.contains('page-break')) { flow.push('FORCE_BREAK'); page.removeChild(n); return; }\n" +
+			"      var pos = getComputedStyle(n).position;\n" +
+			"      if (pos === 'absolute' || pos === 'fixed') {\n" +
+			"        if (!isLikelyTextBox(n)) { return; }\n" +
+			"        // 将文本框转为参与正常流的块元素\n" +
+			"        n.dataset.flowText = '1';\n" +
+			"        n.style.position = 'static';\n" +
+			"        n.style.left = ''; n.style.top = '';\n" +
+			"        n.style.width = '100%';\n" +
+			"        n.style.whiteSpace = 'normal';\n" +
+			"        n.style.display = 'block';\n" +
+			"      }\n" +
+			"      flow.push(n); page.removeChild(n);\n" +
+			"    });\n" +
+			"  });\n" +
+			"  for (var i=pages.length-1;i>=1;i--) { container.removeChild(pages[i]); }\n" +
+			"  pages = [firstPage];\n" +
+			"  function newPage(){ var p = document.createElement('div'); p.className='page'; container.appendChild(p); pages.push(p); return p; }\n" +
+			"  var current = firstPage;\n" +
+			"  var limit = getUsableHeight(current);\n" +
+			"  flow.forEach(function(node){\n" +
+			"    if (node === 'FORCE_BREAK'){ current = newPage(); limit = getUsableHeight(current); return; }\n" +
+			"    \n" +
+			"    if (node.tagName === 'TABLE') {\n" +
+			"      // 表格按行拆分页，并在每页重复表头\n" +
+			"      var original = node;\n" +
+			"      var colgroup = original.querySelector('colgroup');\n" +
+			"      var thead = original.querySelector('thead');\n" +
+			"      var tbody = original.querySelector('tbody') || original;\n" +
+			"      var rows = Array.from(tbody.querySelectorAll('tr'));\n" +
+			"      \n" +
+			"      console.log('处理表格，行数:', rows.length);\n" +
+			"      \n" +
+			"      // 如果表格行数很少，直接尝试放入当前页\n" +
+			"      if (rows.length <= 3) {\n" +
+			"        current.appendChild(original);\n" +
+			"        if (isElementOverflowing(current)) {\n" +
+			"          current.removeChild(original);\n" +
+			"          current = newPage();\n" +
+			"          current.appendChild(original);\n" +
+			"        }\n" +
+			"        return;\n" +
+			"      }\n" +
+			"      \n" +
+			"      // 对于大表格，强制进行行级分页处理\n" +
+			"      console.log('大表格处理，行数:', rows.length);\n" +
+			"      // 如果没有 thead/tbody，构建一个简易的 thead 以确保表头重复\n" +
+			"      var headerRows = [];\n" +
+			"      if (thead) { headerRows = Array.from(thead.querySelectorAll('tr')); }\n" +
+			"      // 如果没有明确的表头，尝试从第一行创建表头\n" +
+			"      if (headerRows.length === 0 && rows.length > 0) {\n" +
+			"        var firstRow = rows[0];\n" +
+			"        if (firstRow.querySelector('th')) {\n" +
+			"          headerRows = [firstRow];\n" +
+			"          rows = rows.slice(1);\n" +
+			"        }\n" +
+			"      }\n" +
+			"      // 创建新表的帮助函数\n" +
+			"      function createTableShell(){\n" +
+			"        var t = document.createElement('table');\n" +
+			"        if (colgroup) t.appendChild(colgroup.cloneNode(true));\n" +
+			"        var thd = document.createElement('thead');\n" +
+			"        if (headerRows.length > 0) { headerRows.forEach(function(hr){ thd.appendChild(hr.cloneNode(true)); }); }\n" +
+			"        t.appendChild(thd);\n" +
+			"        var tbd = document.createElement('tbody');\n" +
+			"        t.appendChild(tbd);\n" +
+			"        return {table:t, body:tbd};\n" +
+			"      }\n" +
+			"      var part = createTableShell();\n" +
+			"      current.appendChild(part.table);\n" +
+			"      console.log('开始处理表格行，当前页面:', current);\n" +
+			"      for (var i=0;i<rows.length;i++){\n" +
+			"        part.body.appendChild(rows[i]);\n" +
+			"        // 检查页面是否溢出，使用更准确的高度检测\n" +
+			"        if (isElementOverflowing(current)){\n" +
+			"          console.log('页面溢出，处理第', i, '行');\n" +
+			"          // 溢出，回收最后一行\n" +
+			"          part.body.removeChild(rows[i]);\n" +
+			"          // 如果当前页没有任何数据行，直接换页并强行放入一行，避免死循环\n" +
+			"          var hasAnyRow = part.body.querySelector('tr') != null;\n" +
+			"          if (!hasAnyRow){\n" +
+			"            console.log('当前页无数据行，换页');\n" +
+			"            current.removeChild(part.table);\n" +
+			"            current = newPage();\n" +
+			"            console.log('创建新页面:', current);\n" +
+			"            current.appendChild(part.table);\n" +
+			"            part.body.appendChild(rows[i]);\n" +
+			"          } else {\n" +
+			"            console.log('换新页新表');\n" +
+			"            // 换新页新表并重试当前行\n" +
+			"            current = newPage();\n" +
+			"            console.log('创建新页面:', current);\n" +
+			"            part = createTableShell();\n" +
+			"            current.appendChild(part.table);\n" +
+			"            part.body.appendChild(rows[i]);\n" +
+			"          }\n" +
+			"        }\n" +
+			"      }\n" +
+			"      console.log('表格处理完成，总页面数:', pages.length);\n" +
+			"    } else {\n" +
+			"      // 非表格节点：若标记为文本框，按子块拆分页\n" +
+			"      if (node.dataset && node.dataset.flowText === '1') {\n" +
+			"        var children = Array.from(node.childNodes).filter(function(c){ return c instanceof HTMLElement; });\n" +
+			"        var shell = document.createElement('div');\n" +
+			"        shell.style.width = '100%'; shell.style.whiteSpace = 'normal'; shell.style.display = 'block';\n" +
+			"        current.appendChild(shell);\n" +
+			"        children.forEach(function(c){\n" +
+			"          shell.appendChild(c);\n" +
+			"          if (isElementOverflowing(current)) {\n" +
+			"            shell.removeChild(c);\n" +
+			"            current = newPage();\n" +
+			"            shell = document.createElement('div');\n" +
+			"            shell.style.width = '100%'; shell.style.whiteSpace = 'normal'; shell.style.display = 'block';\n" +
+			"            current.appendChild(shell);\n" +
+			"            shell.appendChild(c);\n" +
+			"          }\n" +
+			"        });\n" +
+			"      } else {\n" +
+			"        current.appendChild(node);\n" +
+			"        if (isElementOverflowing(current)) {\n" +
+			"          current.removeChild(node);\n" +
+			"          current = newPage();\n" +
+			"          current.appendChild(node);\n" +
+			"        }\n" +
+			"      }\n" +
+			"    }\n" +
+			"  });\n" +
+			"});\n"))
+	body.AppendChild(paginate)
 
 	if img := ctx.renderImgData(); img != nil {
 		body.AppendChild(img)
 	}
 
 	style := E("style")
-	style.AppendChild(T("\np { margin: 0; }\n")) // reset paragraphs
+	style.AppendChild(T(
+		"html, body { height: 100%; background: transparent; }\n" +
+			"body { margin: 0; font-family: -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans','Liberation Sans',sans-serif; color: #111; }\n" +
+			".page-container { display: flex; flex-direction: column; align-items: center; gap: 20px; padding: 20px 12px 40px; box-sizing: border-box; }\n" +
+			".page { position: relative; width: min(900px, calc(100vw - 48px)); aspect-ratio: 210 / 297; background: #fff; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.25); box-sizing: border-box; padding: 20px; }\n" +
+			".page * { box-sizing: border-box; }\n" +
+			"p { margin: 0; line-height: 1.2; }\n" +
+			".page table { border-collapse: collapse; border-spacing: 0; width: 100%; margin: 0; table-layout: fixed; }\n" +
+			".page td { padding: 6pt 8pt; line-height: 1.3; vertical-align: top; word-wrap: break-word; overflow-wrap: break-word; border: 0; }\n" +
+			".page th { padding: 6pt 8pt; line-height: 1.3; vertical-align: top; font-weight: bold; word-wrap: break-word; overflow-wrap: break-word; white-space: normal; border: 0; }\n"))
 	for k, v := range ctx.styles {
 		style.AppendChild(T(fmt.Sprintf(".%s {\n%s}\n", k, v)))
 	}
@@ -560,10 +2073,23 @@ func (ctx *Context) processKeynote() *html.Node {
 	}
 	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
 
+	// Read canvas size to set slide aspect ratio precisely
+	canvasW := 1920.0
+	canvasH := 1080.0
+	for _, rec := range ctx.ix.Records {
+		if sh, ok := rec.(*KN.ShowArchive); ok {
+			if sh.Size != nil && sh.Size.Width != nil && sh.Size.Height != nil {
+				canvasW = float64(*sh.Size.Width)
+				canvasH = float64(*sh.Size.Height)
+			}
+			break
+		}
+	}
+
 	container := E("container", []string{"class", "slide-container"})
 	for _, id := range ids {
 		slide := ctx.ix.Records[id].(*KN.SlideArchive)
-		div := E("div", []string{"class", "slide"})
+		div := E("div", []string{"class", "slide", "style", fmt.Sprintf("aspect-ratio: %.0f / %.0f;", canvasW, canvasH)})
 		for _, d := range append([]*TSP.Reference{slide.BodyPlaceholder}, slide.Drawables...) {
 			if d == nil {
 				continue
@@ -582,7 +2108,17 @@ func (ctx *Context) processKeynote() *html.Node {
 	}
 
 	style := E("style")
-	style.AppendChild(T(".slide-container { display: flex; flex-direction: column; height: 100%;}\n.slide { flex: 1; background-color: #f0f0f0; padding: 50px; font-size: 24px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.3); transition: transform 0.5s ease, box-shadow 0.5s ease;}\n.slide:hover { transform: scale(1.01); box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);}\np { margin: 0; }\n")) // reset paragraphs
+	style.AppendChild(T(
+		"html, body { height: 100%; background: transparent; }\n" +
+			"body { margin: 0; font-family: -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,'Noto Sans','Liberation Sans',sans-serif; color: #111; }\n" +
+			".slide-container { display: flex; flex-direction: column; align-items: center; gap: 28px; padding: 40px 24px 80px; box-sizing: border-box; }\n" +
+			".slide { position: relative; width: min(1200px, calc(100vw - 48px)); aspect-ratio: 16 / 9; background: transparent; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.25); box-sizing: border-box; }\n" +
+			".slide:hover { box-shadow: 0 14px 40px rgba(0,0,0,0.35); }\n" +
+			"p { margin: 0; }\n" +
+			".slide img { max-width: 100%; max-height: 100%; height: auto; object-fit: contain; display: block; position: relative; z-index: 0; }\n" +
+			".slide .background-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center; z-index: 0; }\n" +
+			".slide > :not(.background-img) { position: relative; z-index: 1; }\n" +
+			".slide p, .slide span, .slide b, .slide em, .slide h1, .slide h2, .slide h3, .slide h4 { position: relative; z-index: 2; }\n"))
 	for k, v := range ctx.styles {
 		style.AppendChild(T(fmt.Sprintf(".%s {\n%s}\n", k, v)))
 	}
@@ -609,18 +2145,24 @@ func mergeCharProps(props *TSWP.CharacterStylePropertiesArchive, parent *TSWP.Ch
 
 // translateCharProps converts a TSWP.CharacterStylePropertiesArchive into CSS
 func translateCharProps(props *TSWP.CharacterStylePropertiesArchive) string {
+	if props == nil {
+		return ""
+	}
+
 	rval := ""
 	if props.Bold != nil && *props.Bold {
-		rval += "  font-weight: bold;\n"
+		rval += "font-weight: bold;"
 	}
 	if props.Italic != nil && *props.Italic {
-		rval += "  font-style: italic;\n"
+		rval += "font-style: italic;"
 	}
 	if props.FontSize != nil {
-		rval += fmt.Sprintf("  font-size: %fpt;\n", *props.FontSize)
+		fs := float64(*props.FontSize)
+		// 直接使用原始字体大小，不进行缩放
+		rval += fmt.Sprintf("font-size: %.2fpt;", fs)
 	}
 	if props.FontName != nil {
-		rval += fmt.Sprintf("  font-family: '%s';\n", *props.FontName)
+		rval += fmt.Sprintf("font-family: '%s';", *props.FontName)
 	}
 	return rval
 }
@@ -646,8 +2188,21 @@ func mergeParaProps(props *TSWP.ParagraphStylePropertiesArchive, parent *TSWP.Pa
 }
 
 // translateParaProps converts a TSWP.ParagraphStylePropertiesArchive into CSS.
-func translateParaProps(props *TSWP.ParagraphStylePropertiesArchive) string {
+func translateParaProps(ix *index.Index, props *TSWP.ParagraphStylePropertiesArchive) string {
 	rval := ""
+	// text alignment
+	if props.Alignment != nil {
+		switch *props.Alignment {
+		case TSWP.ParagraphStylePropertiesArchive_TATvalue0:
+			rval += "  text-align: left;\n"
+		case TSWP.ParagraphStylePropertiesArchive_TATvalue1:
+			rval += "  text-align: right;\n"
+		case TSWP.ParagraphStylePropertiesArchive_TATvalue2:
+			rval += "  text-align: center;\n"
+		case TSWP.ParagraphStylePropertiesArchive_TATvalue3:
+			rval += "  text-align: justify;\n"
+		}
+	}
 
 	if props.LeftIndent != nil && *props.LeftIndent != 0. {
 		rval += fmt.Sprintf("  margin-left: %fpt;\n", *props.LeftIndent)
@@ -671,6 +2226,27 @@ func translateParaProps(props *TSWP.ParagraphStylePropertiesArchive) string {
 	}
 	if props.SpaceAfter != nil && *props.SpaceAfter > 0. {
 		rval += fmt.Sprintf("  margin-bottom: %fpt;\n", *props.SpaceAfter)
+	}
+
+	// Paragraph background fill -> background / background-color
+	if props.Fill != nil {
+		if css := colorToCSS(props.Fill); css != "" {
+			rval += fmt.Sprintf("  background:%s;\n", css)
+			if strings.HasPrefix(css, "rgba(") || strings.HasPrefix(css, "rgb(") || strings.HasPrefix(css, "#") {
+				rval += fmt.Sprintf("  background-color:%s;\n", css)
+			}
+		}
+	}
+
+	// List style processing - 重新启用简单的列表样式处理
+	if props.ListStyleNull == nil || !*props.ListStyleNull {
+		if props.ListStyle != nil {
+			// 处理列表样式
+			listCSS := translateListStyle(ix, props.ListStyle)
+			if listCSS != "" {
+				rval += listCSS
+			}
+		}
 	}
 
 	return rval
@@ -698,4 +2274,141 @@ func dump(foo interface{}) {
 
 func ptype(x interface{}) {
 	fmt.Printf("type %T\n", x)
+}
+
+// translateListStyle 处理列表样式，返回 CSS 样式
+func translateListStyle(ix *index.Index, listStyleRef *TSP.Reference) string {
+	if listStyleRef == nil {
+		return ""
+	}
+
+	// 从引用中获取 ListStyleArchive
+	ls, ok := ix.Deref(listStyleRef).(*TSWP.ListStyleArchive)
+	if !ok {
+		fmt.Printf("*** 列表样式不是 ListStyleArchive 类型: %T\n", ix.Deref(listStyleRef))
+		return ""
+	}
+
+	rval := ""
+
+	// 改进的列表样式处理
+	if len(ls.LabelTypes) > 0 {
+		labelType := ls.LabelTypes[0]
+		switch labelType {
+		case TSWP.ListStyleArchive_kNumber:
+			// 数字列表
+			rval += "  list-style-type: decimal;\n"
+		case TSWP.ListStyleArchive_kString:
+			// 字符串列表
+			rval += "  list-style-type: disc;\n"
+		case TSWP.ListStyleArchive_kImage:
+			// 图片列表
+			rval += "  list-style-type: disc;\n"
+		default:
+			// 默认使用 disc
+			rval += "  list-style-type: disc;\n"
+		}
+	} else {
+		// 默认使用 disc
+		rval += "  list-style-type: disc;\n"
+	}
+
+	// 处理缩进
+	if len(ls.Indents) > 0 {
+		indent := ls.Indents[0]
+		rval += fmt.Sprintf("  margin-left: %fpt;\n", indent)
+	}
+
+	// 添加基本的列表样式
+	rval += "  margin-bottom: 6pt;\n"
+
+	return rval
+}
+
+// processCellBorders 处理单元格边框和圆角样式
+func processCellBorders(style *string, props *TST.CellStylePropertiesArchive) {
+	// 处理四边边框
+	processCellStroke(style, "border-top", props.TopStroke)
+	processCellStroke(style, "border-right", props.RightStroke)
+	processCellStroke(style, "border-bottom", props.BottomStroke)
+	processCellStroke(style, "border-left", props.LeftStroke)
+
+	// 检查是否有圆角（通过检查边框的 Join 属性）
+	hasRoundJoin := false
+	if props.TopStroke != nil && props.TopStroke.Join != nil && *props.TopStroke.Join == TSD.LineJoin_RoundJoin {
+		hasRoundJoin = true
+	}
+	if props.RightStroke != nil && props.RightStroke.Join != nil && *props.RightStroke.Join == TSD.LineJoin_RoundJoin {
+		hasRoundJoin = true
+	}
+	if props.BottomStroke != nil && props.BottomStroke.Join != nil && *props.BottomStroke.Join == TSD.LineJoin_RoundJoin {
+		hasRoundJoin = true
+	}
+	if props.LeftStroke != nil && props.LeftStroke.Join != nil && *props.LeftStroke.Join == TSD.LineJoin_RoundJoin {
+		hasRoundJoin = true
+	}
+
+	if hasRoundJoin {
+		*style += "border-radius: 4px;"
+	}
+}
+
+// processCellStroke 处理单个边框
+func processCellStroke(style *string, borderProp string, stroke *TSD.StrokeArchive) {
+	if stroke != nil && stroke.Color != nil {
+		col := colorToCSS(stroke.Color)
+		w := 1.0
+		if stroke.Width != nil {
+			w = float64(*stroke.Width)
+		}
+		if col != "" {
+			*style += fmt.Sprintf("%s: %.2fpx solid %s !important;", borderProp, w, col)
+		}
+	}
+}
+
+// processCellFont 处理单元格字体样式
+func processCellFont(style *string, props *TST.CellStylePropertiesArchive) {
+	// 处理单元格字体样式
+	if props == nil {
+		return
+	}
+
+	// CellStylePropertiesArchive 主要处理单元格的布局和边框
+	// 字体样式通过字符样式处理，这里只处理单元格级别的字体设置
+
+	// 处理文本换行
+	if props.TextWrap != nil && *props.TextWrap {
+		*style += "white-space: normal;"
+	} else {
+		*style += "white-space: nowrap;"
+	}
+
+	// 处理垂直对齐
+	if props.VerticalAlignment != nil {
+		switch *props.VerticalAlignment {
+		case 0: // 顶部对齐
+			*style += "vertical-align: top;"
+		case 1: // 中间对齐
+			*style += "vertical-align: middle;"
+		case 2: // 底部对齐
+			*style += "vertical-align: bottom;"
+		}
+	}
+
+	// 处理内边距
+	if props.Padding != nil {
+		if props.Padding.Top != nil {
+			*style += fmt.Sprintf("padding-top: %.2fpt;", float64(*props.Padding.Top))
+		}
+		if props.Padding.Right != nil {
+			*style += fmt.Sprintf("padding-right: %.2fpt;", float64(*props.Padding.Right))
+		}
+		if props.Padding.Bottom != nil {
+			*style += fmt.Sprintf("padding-bottom: %.2fpt;", float64(*props.Padding.Bottom))
+		}
+		if props.Padding.Left != nil {
+			*style += fmt.Sprintf("padding-left: %.2fpt;", float64(*props.Padding.Left))
+		}
+	}
 }

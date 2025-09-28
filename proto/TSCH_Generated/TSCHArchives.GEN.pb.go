@@ -6,9 +6,11 @@
 Package TSCH_Generated is a generated protocol buffer package.
 
 It is generated from these files:
+
 	TSCHArchives.GEN.proto
 
 It has these top-level messages:
+
 	ChartStyleArchive
 	ChartNonStyleArchive
 	LegendStyleArchive
@@ -20,19 +22,23 @@ It has these top-level messages:
 */
 package TSCH_Generated
 
-import proto "github.com/golang/protobuf/proto"
-import math "math"
-import "github.com/orcastor/iwork-converter/proto/TSP"
-import "github.com/orcastor/iwork-converter/proto/TSK"
-import "github.com/orcastor/iwork-converter/proto/TSD"
+import (
+	math "math"
+
+	proto "github.com/golang/protobuf/proto"
+	"github.com/orcastor/iwork-converter/proto/TSCH"
+	"github.com/orcastor/iwork-converter/proto/TSD"
+	"github.com/orcastor/iwork-converter/proto/TSK"
+	"github.com/orcastor/iwork-converter/proto/TSP"
+)
 
 // discarding unused import TSS "TSSArchives.pb"
-import "github.com/orcastor/iwork-converter/proto/TSCH1"
-import "github.com/orcastor/iwork-converter/proto/TSCH"
 
 // Reference imports to suppress errors if they are not otherwise used.
-var _ = proto.Marshal
-var _ = math.Inf
+var (
+	_ = proto.Marshal
+	_ = math.Inf
+)
 
 type ChartStyleArchive struct {
 	Tschchartinfodefault3Dchartopacity                 *float32                            `protobuf:"fixed32,1,opt,name=tschchartinfodefault3dchartopacity" json:"tschchartinfodefault3dchartopacity,omitempty"`
@@ -211,7 +217,7 @@ func (m *ChartStyleArchive) GetTschchartinfodefaultdatasetnameparagraphstyleinde
 }
 
 var E_ChartStyleArchive_Current = &proto.ExtensionDesc{
-	ExtendedType:  (*TSCH1.ChartStyleArchive)(nil),
+	ExtendedType:  (*TSCH.ChartStyleArchive)(nil),
 	ExtensionType: (*ChartStyleArchive)(nil),
 	Field:         10000,
 	Name:          "TSCH.Generated.ChartStyleArchive.current",
@@ -371,7 +377,7 @@ func (m *ChartNonStyleArchive) GetTschchartinfodefaultmultidatacontroltype() int
 }
 
 var E_ChartNonStyleArchive_Current = &proto.ExtensionDesc{
-	ExtendedType:  (*TSCH1.ChartNonStyleArchive)(nil),
+	ExtendedType:  (*TSCH.ChartNonStyleArchive)(nil),
 	ExtensionType: (*ChartNonStyleArchive)(nil),
 	Field:         10000,
 	Name:          "TSCH.Generated.ChartNonStyleArchive.current",
@@ -427,7 +433,7 @@ func (m *LegendStyleArchive) GetTschlegendmodeldefaultstroke() *TSD.StrokeArchiv
 }
 
 var E_LegendStyleArchive_Current = &proto.ExtensionDesc{
-	ExtendedType:  (*TSCH1.LegendStyleArchive)(nil),
+	ExtendedType:  (*TSCH.LegendStyleArchive)(nil),
 	ExtensionType: (*LegendStyleArchive)(nil),
 	Field:         10000,
 	Name:          "TSCH.Generated.LegendStyleArchive.current",
@@ -443,7 +449,7 @@ func (m *LegendNonStyleArchive) String() string { return proto.CompactTextString
 func (*LegendNonStyleArchive) ProtoMessage()    {}
 
 var E_LegendNonStyleArchive_Current = &proto.ExtensionDesc{
-	ExtendedType:  (*TSCH1.LegendNonStyleArchive)(nil),
+	ExtendedType:  (*TSCH.LegendNonStyleArchive)(nil),
 	ExtensionType: (*LegendNonStyleArchive)(nil),
 	Field:         10000,
 	Name:          "TSCH.Generated.LegendNonStyleArchive.current",
@@ -787,7 +793,7 @@ func (m *ChartAxisStyleArchive) GetTschchartaxiscategoryverticalspacing() int32 
 }
 
 var E_ChartAxisStyleArchive_Current = &proto.ExtensionDesc{
-	ExtendedType:  (*TSCH1.ChartAxisStyleArchive)(nil),
+	ExtendedType:  (*TSCH.ChartAxisStyleArchive)(nil),
 	ExtensionType: (*ChartAxisStyleArchive)(nil),
 	Field:         10000,
 	Name:          "TSCH.Generated.ChartAxisStyleArchive.current",
@@ -795,26 +801,26 @@ var E_ChartAxisStyleArchive_Current = &proto.ExtensionDesc{
 }
 
 type ChartAxisNonStyleArchive struct {
-	Tschchartaxisdefault3Dlabelposition      *int32                             `protobuf:"varint,1,opt,name=tschchartaxisdefault3dlabelposition" json:"tschchartaxisdefault3dlabelposition,omitempty"`
-	Tschchartaxisdefaultnumberformat         *TSK.FormatStructArchive           `protobuf:"bytes,2,opt,name=tschchartaxisdefaultnumberformat" json:"tschchartaxisdefaultnumberformat,omitempty"`
-	Tschchartaxisdefaultnumberformattype     *int32                             `protobuf:"varint,3,opt,name=tschchartaxisdefaultnumberformattype" json:"tschchartaxisdefaultnumberformattype,omitempty"`
-	Tschchartaxisvaluenumberofdecades        *int32                             `protobuf:"varint,4,opt,name=tschchartaxisvaluenumberofdecades" json:"tschchartaxisvaluenumberofdecades,omitempty"`
-	Tschchartaxisvaluenumberofmajorgridlines *int32                             `protobuf:"varint,5,opt,name=tschchartaxisvaluenumberofmajorgridlines" json:"tschchartaxisvaluenumberofmajorgridlines,omitempty"`
-	Tschchartaxisvaluenumberofminorgridlines *int32                             `protobuf:"varint,6,opt,name=tschchartaxisvaluenumberofminorgridlines" json:"tschchartaxisvaluenumberofminorgridlines,omitempty"`
-	Tschchartaxiscategoryplottoedges         *bool                              `protobuf:"varint,7,opt,name=tschchartaxiscategoryplottoedges" json:"tschchartaxiscategoryplottoedges,omitempty"`
-	Tschchartaxisvaluescale                  *int32                             `protobuf:"varint,8,opt,name=tschchartaxisvaluescale" json:"tschchartaxisvaluescale,omitempty"`
-	Tschchartaxiscategoryshowlabels          *bool                              `protobuf:"varint,9,opt,name=tschchartaxiscategoryshowlabels" json:"tschchartaxiscategoryshowlabels,omitempty"`
-	Tschchartaxisdefaultshowlabels           *bool                              `protobuf:"varint,10,opt,name=tschchartaxisdefaultshowlabels" json:"tschchartaxisdefaultshowlabels,omitempty"`
-	Tschchartaxisvalueshowlabels             *bool                              `protobuf:"varint,11,opt,name=tschchartaxisvalueshowlabels" json:"tschchartaxisvalueshowlabels,omitempty"`
-	Tschchartaxiscategoryshowserieslabels    *bool                              `protobuf:"varint,12,opt,name=tschchartaxiscategoryshowserieslabels" json:"tschchartaxiscategoryshowserieslabels,omitempty"`
-	Tschchartaxismultidatashowserieslabels   *bool                              `protobuf:"varint,19,opt,name=tschchartaxismultidatashowserieslabels" json:"tschchartaxismultidatashowserieslabels,omitempty"`
-	Tschchartaxiscategoryshowtitle           *bool                              `protobuf:"varint,13,opt,name=tschchartaxiscategoryshowtitle" json:"tschchartaxiscategoryshowtitle,omitempty"`
-	Tschchartaxisvalueshowtitle              *bool                              `protobuf:"varint,14,opt,name=tschchartaxisvalueshowtitle" json:"tschchartaxisvalueshowtitle,omitempty"`
-	Tschchartaxiscategorytitle               *string                            `protobuf:"bytes,15,opt,name=tschchartaxiscategorytitle" json:"tschchartaxiscategorytitle,omitempty"`
-	Tschchartaxisvaluetitle                  *string                            `protobuf:"bytes,16,opt,name=tschchartaxisvaluetitle" json:"tschchartaxisvaluetitle,omitempty"`
-	Tschchartaxisdefaultusermax              *TSCH1.ChartsNSNumberDoubleArchive `protobuf:"bytes,17,opt,name=tschchartaxisdefaultusermax" json:"tschchartaxisdefaultusermax,omitempty"`
-	Tschchartaxisdefaultusermin              *TSCH1.ChartsNSNumberDoubleArchive `protobuf:"bytes,18,opt,name=tschchartaxisdefaultusermin" json:"tschchartaxisdefaultusermin,omitempty"`
-	XXX_unrecognized                         []byte                             `json:"-"`
+	Tschchartaxisdefault3Dlabelposition      *int32                            `protobuf:"varint,1,opt,name=tschchartaxisdefault3dlabelposition" json:"tschchartaxisdefault3dlabelposition,omitempty"`
+	Tschchartaxisdefaultnumberformat         *TSK.FormatStructArchive          `protobuf:"bytes,2,opt,name=tschchartaxisdefaultnumberformat" json:"tschchartaxisdefaultnumberformat,omitempty"`
+	Tschchartaxisdefaultnumberformattype     *int32                            `protobuf:"varint,3,opt,name=tschchartaxisdefaultnumberformattype" json:"tschchartaxisdefaultnumberformattype,omitempty"`
+	Tschchartaxisvaluenumberofdecades        *int32                            `protobuf:"varint,4,opt,name=tschchartaxisvaluenumberofdecades" json:"tschchartaxisvaluenumberofdecades,omitempty"`
+	Tschchartaxisvaluenumberofmajorgridlines *int32                            `protobuf:"varint,5,opt,name=tschchartaxisvaluenumberofmajorgridlines" json:"tschchartaxisvaluenumberofmajorgridlines,omitempty"`
+	Tschchartaxisvaluenumberofminorgridlines *int32                            `protobuf:"varint,6,opt,name=tschchartaxisvaluenumberofminorgridlines" json:"tschchartaxisvaluenumberofminorgridlines,omitempty"`
+	Tschchartaxiscategoryplottoedges         *bool                             `protobuf:"varint,7,opt,name=tschchartaxiscategoryplottoedges" json:"tschchartaxiscategoryplottoedges,omitempty"`
+	Tschchartaxisvaluescale                  *int32                            `protobuf:"varint,8,opt,name=tschchartaxisvaluescale" json:"tschchartaxisvaluescale,omitempty"`
+	Tschchartaxiscategoryshowlabels          *bool                             `protobuf:"varint,9,opt,name=tschchartaxiscategoryshowlabels" json:"tschchartaxiscategoryshowlabels,omitempty"`
+	Tschchartaxisdefaultshowlabels           *bool                             `protobuf:"varint,10,opt,name=tschchartaxisdefaultshowlabels" json:"tschchartaxisdefaultshowlabels,omitempty"`
+	Tschchartaxisvalueshowlabels             *bool                             `protobuf:"varint,11,opt,name=tschchartaxisvalueshowlabels" json:"tschchartaxisvalueshowlabels,omitempty"`
+	Tschchartaxiscategoryshowserieslabels    *bool                             `protobuf:"varint,12,opt,name=tschchartaxiscategoryshowserieslabels" json:"tschchartaxiscategoryshowserieslabels,omitempty"`
+	Tschchartaxismultidatashowserieslabels   *bool                             `protobuf:"varint,19,opt,name=tschchartaxismultidatashowserieslabels" json:"tschchartaxismultidatashowserieslabels,omitempty"`
+	Tschchartaxiscategoryshowtitle           *bool                             `protobuf:"varint,13,opt,name=tschchartaxiscategoryshowtitle" json:"tschchartaxiscategoryshowtitle,omitempty"`
+	Tschchartaxisvalueshowtitle              *bool                             `protobuf:"varint,14,opt,name=tschchartaxisvalueshowtitle" json:"tschchartaxisvalueshowtitle,omitempty"`
+	Tschchartaxiscategorytitle               *string                           `protobuf:"bytes,15,opt,name=tschchartaxiscategorytitle" json:"tschchartaxiscategorytitle,omitempty"`
+	Tschchartaxisvaluetitle                  *string                           `protobuf:"bytes,16,opt,name=tschchartaxisvaluetitle" json:"tschchartaxisvaluetitle,omitempty"`
+	Tschchartaxisdefaultusermax              *TSCH.ChartsNSNumberDoubleArchive `protobuf:"bytes,17,opt,name=tschchartaxisdefaultusermax" json:"tschchartaxisdefaultusermax,omitempty"`
+	Tschchartaxisdefaultusermin              *TSCH.ChartsNSNumberDoubleArchive `protobuf:"bytes,18,opt,name=tschchartaxisdefaultusermin" json:"tschchartaxisdefaultusermin,omitempty"`
+	XXX_unrecognized                         []byte                            `json:"-"`
 }
 
 func (m *ChartAxisNonStyleArchive) Reset()         { *m = ChartAxisNonStyleArchive{} }
@@ -940,14 +946,14 @@ func (m *ChartAxisNonStyleArchive) GetTschchartaxisvaluetitle() string {
 	return ""
 }
 
-func (m *ChartAxisNonStyleArchive) GetTschchartaxisdefaultusermax() *TSCH1.ChartsNSNumberDoubleArchive {
+func (m *ChartAxisNonStyleArchive) GetTschchartaxisdefaultusermax() *TSCH.ChartsNSNumberDoubleArchive {
 	if m != nil {
 		return m.Tschchartaxisdefaultusermax
 	}
 	return nil
 }
 
-func (m *ChartAxisNonStyleArchive) GetTschchartaxisdefaultusermin() *TSCH1.ChartsNSNumberDoubleArchive {
+func (m *ChartAxisNonStyleArchive) GetTschchartaxisdefaultusermin() *TSCH.ChartsNSNumberDoubleArchive {
 	if m != nil {
 		return m.Tschchartaxisdefaultusermin
 	}
@@ -955,7 +961,7 @@ func (m *ChartAxisNonStyleArchive) GetTschchartaxisdefaultusermin() *TSCH1.Chart
 }
 
 var E_ChartAxisNonStyleArchive_Current = &proto.ExtensionDesc{
-	ExtendedType:  (*TSCH1.ChartAxisNonStyleArchive)(nil),
+	ExtendedType:  (*TSCH.ChartAxisNonStyleArchive)(nil),
 	ExtensionType: (*ChartAxisNonStyleArchive)(nil),
 	Field:         10000,
 	Name:          "TSCH.Generated.ChartAxisNonStyleArchive.current",
@@ -1747,7 +1753,7 @@ func (m *ChartSeriesStyleArchive) GetTschchartseriesstackedbarvaluelabelposition
 }
 
 var E_ChartSeriesStyleArchive_Current = &proto.ExtensionDesc{
-	ExtendedType:  (*TSCH1.ChartSeriesStyleArchive)(nil),
+	ExtendedType:  (*TSCH.ChartSeriesStyleArchive)(nil),
 	ExtensionType: (*ChartSeriesStyleArchive)(nil),
 	Field:         10000,
 	Name:          "TSCH.Generated.ChartSeriesStyleArchive.current",
@@ -1755,75 +1761,75 @@ var E_ChartSeriesStyleArchive_Current = &proto.ExtensionDesc{
 }
 
 type ChartSeriesNonStyleArchive struct {
-	Tschchartseriesbubbleadjustmentscale                     *float32                                    `protobuf:"fixed32,1,opt,name=tschchartseriesbubbleadjustmentscale" json:"tschchartseriesbubbleadjustmentscale,omitempty"`
-	Tschchartseriesdefaulterrorbarcustomnegativedata         *TSCH1.ChartsNSArrayOfNSNumberDoubleArchive `protobuf:"bytes,2,opt,name=tschchartseriesdefaulterrorbarcustomnegativedata" json:"tschchartseriesdefaulterrorbarcustomnegativedata,omitempty"`
-	Tschchartseriesdefaulterrorbarcustomnegativedatascatterx *TSCH1.ChartsNSArrayOfNSNumberDoubleArchive `protobuf:"bytes,3,opt,name=tschchartseriesdefaulterrorbarcustomnegativedatascatterx" json:"tschchartseriesdefaulterrorbarcustomnegativedatascatterx,omitempty"`
-	Tschchartseriesdefaulterrorbarcustompositivedata         *TSCH1.ChartsNSArrayOfNSNumberDoubleArchive `protobuf:"bytes,4,opt,name=tschchartseriesdefaulterrorbarcustompositivedata" json:"tschchartseriesdefaulterrorbarcustompositivedata,omitempty"`
-	Tschchartseriesdefaulterrorbarcustompositivedatascatterx *TSCH1.ChartsNSArrayOfNSNumberDoubleArchive `protobuf:"bytes,5,opt,name=tschchartseriesdefaulterrorbarcustompositivedatascatterx" json:"tschchartseriesdefaulterrorbarcustompositivedatascatterx,omitempty"`
-	Tschchartseriesdefaulterrorbarfixedvalue                 *float32                                    `protobuf:"fixed32,6,opt,name=tschchartseriesdefaulterrorbarfixedvalue" json:"tschchartseriesdefaulterrorbarfixedvalue,omitempty"`
-	Tschchartseriesdefaulterrorbarfixedvaluescatterx         *float32                                    `protobuf:"fixed32,7,opt,name=tschchartseriesdefaulterrorbarfixedvaluescatterx" json:"tschchartseriesdefaulterrorbarfixedvaluescatterx,omitempty"`
-	Tschchartseriesdefaulterrorbarpercentvalue               *float32                                    `protobuf:"fixed32,8,opt,name=tschchartseriesdefaulterrorbarpercentvalue" json:"tschchartseriesdefaulterrorbarpercentvalue,omitempty"`
-	Tschchartseriesdefaulterrorbarpercentvaluescatterx       *float32                                    `protobuf:"fixed32,9,opt,name=tschchartseriesdefaulterrorbarpercentvaluescatterx" json:"tschchartseriesdefaulterrorbarpercentvaluescatterx,omitempty"`
-	Tschchartseriesdefaulterrorbarsetting                    *int32                                      `protobuf:"varint,10,opt,name=tschchartseriesdefaulterrorbarsetting" json:"tschchartseriesdefaulterrorbarsetting,omitempty"`
-	Tschchartseriesdefaulterrorbarsettingscatterx            *int32                                      `protobuf:"varint,11,opt,name=tschchartseriesdefaulterrorbarsettingscatterx" json:"tschchartseriesdefaulterrorbarsettingscatterx,omitempty"`
-	Tschchartseriesdefaulterrorbarstddevvalue                *float32                                    `protobuf:"fixed32,12,opt,name=tschchartseriesdefaulterrorbarstddevvalue" json:"tschchartseriesdefaulterrorbarstddevvalue,omitempty"`
-	Tschchartseriesdefaulterrorbarstddevvaluescatterx        *float32                                    `protobuf:"fixed32,13,opt,name=tschchartseriesdefaulterrorbarstddevvaluescatterx" json:"tschchartseriesdefaulterrorbarstddevvaluescatterx,omitempty"`
-	Tschchartseriesdefaulterrorbartype                       *int32                                      `protobuf:"varint,14,opt,name=tschchartseriesdefaulterrorbartype" json:"tschchartseriesdefaulterrorbartype,omitempty"`
-	Tschchartseriesdefaulterrorbartypescatterx               *int32                                      `protobuf:"varint,15,opt,name=tschchartseriesdefaulterrorbartypescatterx" json:"tschchartseriesdefaulterrorbartypescatterx,omitempty"`
-	Tschchartseriespielabelexplosion                         *float32                                    `protobuf:"fixed32,16,opt,name=tschchartseriespielabelexplosion" json:"tschchartseriespielabelexplosion,omitempty"`
-	Tschchartseriesbubblelinetype                            *int32                                      `protobuf:"varint,17,opt,name=tschchartseriesbubblelinetype" json:"tschchartseriesbubblelinetype,omitempty"`
-	Tschchartserieslinelinetype                              *int32                                      `protobuf:"varint,18,opt,name=tschchartserieslinelinetype" json:"tschchartserieslinelinetype,omitempty"`
-	Tschchartseriesmixedlinelinetype                         *int32                                      `protobuf:"varint,19,opt,name=tschchartseriesmixedlinelinetype" json:"tschchartseriesmixedlinelinetype,omitempty"`
-	Tschchartseriesscatterlinetype                           *int32                                      `protobuf:"varint,20,opt,name=tschchartseriesscatterlinetype" json:"tschchartseriesscatterlinetype,omitempty"`
-	Tschchartseriesdefaultnumberformat                       *TSK.FormatStructArchive                    `protobuf:"bytes,21,opt,name=tschchartseriesdefaultnumberformat" json:"tschchartseriesdefaultnumberformat,omitempty"`
-	Tschchartseriespienumberformat                           *TSK.FormatStructArchive                    `protobuf:"bytes,22,opt,name=tschchartseriespienumberformat" json:"tschchartseriespienumberformat,omitempty"`
-	Tschchartseriesdefaultnumberformattype                   *int32                                      `protobuf:"varint,23,opt,name=tschchartseriesdefaultnumberformattype" json:"tschchartseriesdefaultnumberformattype,omitempty"`
-	Tschchartseriespienumberformattype                       *int32                                      `protobuf:"varint,24,opt,name=tschchartseriespienumberformattype" json:"tschchartseriespienumberformattype,omitempty"`
-	Tschchartseriesstackedpercentnumberformat                *TSK.FormatStructArchive                    `protobuf:"bytes,25,opt,name=tschchartseriesstackedpercentnumberformat" json:"tschchartseriesstackedpercentnumberformat,omitempty"`
-	Tschchartseriesdefaultseriestype                         *int32                                      `protobuf:"varint,26,opt,name=tschchartseriesdefaultseriestype" json:"tschchartseriesdefaultseriestype,omitempty"`
-	Tschchartseriesdefaultshowerrorbar                       *bool                                       `protobuf:"varint,27,opt,name=tschchartseriesdefaultshowerrorbar" json:"tschchartseriesdefaultshowerrorbar,omitempty"`
-	Tschchartseriesdefaultshowerrorbarscatterx               *bool                                       `protobuf:"varint,28,opt,name=tschchartseriesdefaultshowerrorbarscatterx" json:"tschchartseriesdefaultshowerrorbarscatterx,omitempty"`
-	Tschchartseriesscattershowline                           *bool                                       `protobuf:"varint,29,opt,name=tschchartseriesscattershowline" json:"tschchartseriesscattershowline,omitempty"`
-	Tschchartseriesbubbleshownegativedata                    *bool                                       `protobuf:"varint,30,opt,name=tschchartseriesbubbleshownegativedata" json:"tschchartseriesbubbleshownegativedata,omitempty"`
-	Tschchartseriespieshowserieslabels                       *bool                                       `protobuf:"varint,31,opt,name=tschchartseriespieshowserieslabels" json:"tschchartseriespieshowserieslabels,omitempty"`
-	Tschchartseriesareashowsymbol                            *bool                                       `protobuf:"varint,32,opt,name=tschchartseriesareashowsymbol" json:"tschchartseriesareashowsymbol,omitempty"`
-	Tschchartserieslineshowsymbol                            *bool                                       `protobuf:"varint,33,opt,name=tschchartserieslineshowsymbol" json:"tschchartserieslineshowsymbol,omitempty"`
-	Tschchartseriesmixedareashowsymbol                       *bool                                       `protobuf:"varint,34,opt,name=tschchartseriesmixedareashowsymbol" json:"tschchartseriesmixedareashowsymbol,omitempty"`
-	Tschchartseriesmixedlineshowsymbol                       *bool                                       `protobuf:"varint,35,opt,name=tschchartseriesmixedlineshowsymbol" json:"tschchartseriesmixedlineshowsymbol,omitempty"`
-	Tschchartseriesscattershowsymbol                         *bool                                       `protobuf:"varint,36,opt,name=tschchartseriesscattershowsymbol" json:"tschchartseriesscattershowsymbol,omitempty"`
-	Tschchartseriesdefaultshowtrendline                      *bool                                       `protobuf:"varint,37,opt,name=tschchartseriesdefaultshowtrendline" json:"tschchartseriesdefaultshowtrendline,omitempty"`
-	Tschchartseriesareashowvaluelabels                       *bool                                       `protobuf:"varint,38,opt,name=tschchartseriesareashowvaluelabels" json:"tschchartseriesareashowvaluelabels,omitempty"`
-	Tschchartseriesbarshowvaluelabels                        *bool                                       `protobuf:"varint,39,opt,name=tschchartseriesbarshowvaluelabels" json:"tschchartseriesbarshowvaluelabels,omitempty"`
-	Tschchartseriesbubbleshowvaluelabels                     *bool                                       `protobuf:"varint,40,opt,name=tschchartseriesbubbleshowvaluelabels" json:"tschchartseriesbubbleshowvaluelabels,omitempty"`
-	Tschchartseriesdefaultshowvaluelabels                    *bool                                       `protobuf:"varint,41,opt,name=tschchartseriesdefaultshowvaluelabels" json:"tschchartseriesdefaultshowvaluelabels,omitempty"`
-	Tschchartserieslineshowvaluelabels                       *bool                                       `protobuf:"varint,42,opt,name=tschchartserieslineshowvaluelabels" json:"tschchartserieslineshowvaluelabels,omitempty"`
-	Tschchartseriesmixedshowvaluelabels                      *bool                                       `protobuf:"varint,43,opt,name=tschchartseriesmixedshowvaluelabels" json:"tschchartseriesmixedshowvaluelabels,omitempty"`
-	Tschchartseriespieshowvaluelabels                        *bool                                       `protobuf:"varint,44,opt,name=tschchartseriespieshowvaluelabels" json:"tschchartseriespieshowvaluelabels,omitempty"`
-	Tschchartseriesscattershowvaluelabels                    *bool                                       `protobuf:"varint,45,opt,name=tschchartseriesscattershowvaluelabels" json:"tschchartseriesscattershowvaluelabels,omitempty"`
-	Tschchartseriesbubblesizedimension                       *int32                                      `protobuf:"varint,46,opt,name=tschchartseriesbubblesizedimension" json:"tschchartseriesbubblesizedimension,omitempty"`
-	Tschchartseriesareasymboltype                            *int32                                      `protobuf:"varint,47,opt,name=tschchartseriesareasymboltype" json:"tschchartseriesareasymboltype,omitempty"`
-	Tschchartserieslinesymboltype                            *int32                                      `protobuf:"varint,48,opt,name=tschchartserieslinesymboltype" json:"tschchartserieslinesymboltype,omitempty"`
-	Tschchartseriesmixedareasymboltype                       *int32                                      `protobuf:"varint,49,opt,name=tschchartseriesmixedareasymboltype" json:"tschchartseriesmixedareasymboltype,omitempty"`
-	Tschchartseriesmixedlinesymboltype                       *int32                                      `protobuf:"varint,50,opt,name=tschchartseriesmixedlinesymboltype" json:"tschchartseriesmixedlinesymboltype,omitempty"`
-	Tschchartseriesscattersymboltype                         *int32                                      `protobuf:"varint,51,opt,name=tschchartseriesscattersymboltype" json:"tschchartseriesscattersymboltype,omitempty"`
-	Tschchartseriesdefaulttrendlineequationoffsetx           *float32                                    `protobuf:"fixed32,52,opt,name=tschchartseriesdefaulttrendlineequationoffsetx" json:"tschchartseriesdefaulttrendlineequationoffsetx,omitempty"`
-	Tschchartseriesdefaulttrendlineequationoffsety           *float32                                    `protobuf:"fixed32,53,opt,name=tschchartseriesdefaulttrendlineequationoffsety" json:"tschchartseriesdefaulttrendlineequationoffsety,omitempty"`
-	Tschchartseriesdefaulttrendlinelabelstring               *string                                     `protobuf:"bytes,54,opt,name=tschchartseriesdefaulttrendlinelabelstring" json:"tschchartseriesdefaulttrendlinelabelstring,omitempty"`
-	Tschchartseriesdefaulttrendlineorder                     *int32                                      `protobuf:"varint,55,opt,name=tschchartseriesdefaulttrendlineorder" json:"tschchartseriesdefaulttrendlineorder,omitempty"`
-	Tschchartseriesdefaulttrendlineperiod                    *int32                                      `protobuf:"varint,56,opt,name=tschchartseriesdefaulttrendlineperiod" json:"tschchartseriesdefaulttrendlineperiod,omitempty"`
-	Tschchartseriesdefaulttrendlinersquaredoffsetx           *float32                                    `protobuf:"fixed32,57,opt,name=tschchartseriesdefaulttrendlinersquaredoffsetx" json:"tschchartseriesdefaulttrendlinersquaredoffsetx,omitempty"`
-	Tschchartseriesdefaulttrendlinersquaredoffsety           *float32                                    `protobuf:"fixed32,58,opt,name=tschchartseriesdefaulttrendlinersquaredoffsety" json:"tschchartseriesdefaulttrendlinersquaredoffsety,omitempty"`
-	Tschchartseriesdefaulttrendlineshowequation              *bool                                       `protobuf:"varint,59,opt,name=tschchartseriesdefaulttrendlineshowequation" json:"tschchartseriesdefaulttrendlineshowequation,omitempty"`
-	Tschchartseriesdefaulttrendlineshowlabel                 *bool                                       `protobuf:"varint,60,opt,name=tschchartseriesdefaulttrendlineshowlabel" json:"tschchartseriesdefaulttrendlineshowlabel,omitempty"`
-	Tschchartseriesdefaulttrendlineshowr2Value               *bool                                       `protobuf:"varint,61,opt,name=tschchartseriesdefaulttrendlineshowr2value" json:"tschchartseriesdefaulttrendlineshowr2value,omitempty"`
-	Tschchartseriesdefaulttrendlinetype                      *int32                                      `protobuf:"varint,62,opt,name=tschchartseriesdefaulttrendlinetype" json:"tschchartseriesdefaulttrendlinetype,omitempty"`
-	Tschchartseriespiewedgeexplosion                         *float32                                    `protobuf:"fixed32,63,opt,name=tschchartseriespiewedgeexplosion" json:"tschchartseriespiewedgeexplosion,omitempty"`
-	Tschchartseriesdefaultyaxisordinal                       *int32                                      `protobuf:"varint,64,opt,name=tschchartseriesdefaultyaxisordinal" json:"tschchartseriesdefaultyaxisordinal,omitempty"`
-	Tschchartseriesbubbleshowserieslabels                    *bool                                       `protobuf:"varint,65,opt,name=tschchartseriesbubbleshowserieslabels" json:"tschchartseriesbubbleshowserieslabels,omitempty"`
-	Tschchartseriesbubblevaluelabelsaxis                     *int32                                      `protobuf:"varint,66,opt,name=tschchartseriesbubblevaluelabelsaxis" json:"tschchartseriesbubblevaluelabelsaxis,omitempty"`
-	Tschchartseriesscattershowserieslabels                   *bool                                       `protobuf:"varint,67,opt,name=tschchartseriesscattershowserieslabels" json:"tschchartseriesscattershowserieslabels,omitempty"`
-	Tschchartseriesscattervaluelabelsaxis                    *int32                                      `protobuf:"varint,68,opt,name=tschchartseriesscattervaluelabelsaxis" json:"tschchartseriesscattervaluelabelsaxis,omitempty"`
-	XXX_unrecognized                                         []byte                                      `json:"-"`
+	Tschchartseriesbubbleadjustmentscale                     *float32                                   `protobuf:"fixed32,1,opt,name=tschchartseriesbubbleadjustmentscale" json:"tschchartseriesbubbleadjustmentscale,omitempty"`
+	Tschchartseriesdefaulterrorbarcustomnegativedata         *TSCH.ChartsNSArrayOfNSNumberDoubleArchive `protobuf:"bytes,2,opt,name=tschchartseriesdefaulterrorbarcustomnegativedata" json:"tschchartseriesdefaulterrorbarcustomnegativedata,omitempty"`
+	Tschchartseriesdefaulterrorbarcustomnegativedatascatterx *TSCH.ChartsNSArrayOfNSNumberDoubleArchive `protobuf:"bytes,3,opt,name=tschchartseriesdefaulterrorbarcustomnegativedatascatterx" json:"tschchartseriesdefaulterrorbarcustomnegativedatascatterx,omitempty"`
+	Tschchartseriesdefaulterrorbarcustompositivedata         *TSCH.ChartsNSArrayOfNSNumberDoubleArchive `protobuf:"bytes,4,opt,name=tschchartseriesdefaulterrorbarcustompositivedata" json:"tschchartseriesdefaulterrorbarcustompositivedata,omitempty"`
+	Tschchartseriesdefaulterrorbarcustompositivedatascatterx *TSCH.ChartsNSArrayOfNSNumberDoubleArchive `protobuf:"bytes,5,opt,name=tschchartseriesdefaulterrorbarcustompositivedatascatterx" json:"tschchartseriesdefaulterrorbarcustompositivedatascatterx,omitempty"`
+	Tschchartseriesdefaulterrorbarfixedvalue                 *float32                                   `protobuf:"fixed32,6,opt,name=tschchartseriesdefaulterrorbarfixedvalue" json:"tschchartseriesdefaulterrorbarfixedvalue,omitempty"`
+	Tschchartseriesdefaulterrorbarfixedvaluescatterx         *float32                                   `protobuf:"fixed32,7,opt,name=tschchartseriesdefaulterrorbarfixedvaluescatterx" json:"tschchartseriesdefaulterrorbarfixedvaluescatterx,omitempty"`
+	Tschchartseriesdefaulterrorbarpercentvalue               *float32                                   `protobuf:"fixed32,8,opt,name=tschchartseriesdefaulterrorbarpercentvalue" json:"tschchartseriesdefaulterrorbarpercentvalue,omitempty"`
+	Tschchartseriesdefaulterrorbarpercentvaluescatterx       *float32                                   `protobuf:"fixed32,9,opt,name=tschchartseriesdefaulterrorbarpercentvaluescatterx" json:"tschchartseriesdefaulterrorbarpercentvaluescatterx,omitempty"`
+	Tschchartseriesdefaulterrorbarsetting                    *int32                                     `protobuf:"varint,10,opt,name=tschchartseriesdefaulterrorbarsetting" json:"tschchartseriesdefaulterrorbarsetting,omitempty"`
+	Tschchartseriesdefaulterrorbarsettingscatterx            *int32                                     `protobuf:"varint,11,opt,name=tschchartseriesdefaulterrorbarsettingscatterx" json:"tschchartseriesdefaulterrorbarsettingscatterx,omitempty"`
+	Tschchartseriesdefaulterrorbarstddevvalue                *float32                                   `protobuf:"fixed32,12,opt,name=tschchartseriesdefaulterrorbarstddevvalue" json:"tschchartseriesdefaulterrorbarstddevvalue,omitempty"`
+	Tschchartseriesdefaulterrorbarstddevvaluescatterx        *float32                                   `protobuf:"fixed32,13,opt,name=tschchartseriesdefaulterrorbarstddevvaluescatterx" json:"tschchartseriesdefaulterrorbarstddevvaluescatterx,omitempty"`
+	Tschchartseriesdefaulterrorbartype                       *int32                                     `protobuf:"varint,14,opt,name=tschchartseriesdefaulterrorbartype" json:"tschchartseriesdefaulterrorbartype,omitempty"`
+	Tschchartseriesdefaulterrorbartypescatterx               *int32                                     `protobuf:"varint,15,opt,name=tschchartseriesdefaulterrorbartypescatterx" json:"tschchartseriesdefaulterrorbartypescatterx,omitempty"`
+	Tschchartseriespielabelexplosion                         *float32                                   `protobuf:"fixed32,16,opt,name=tschchartseriespielabelexplosion" json:"tschchartseriespielabelexplosion,omitempty"`
+	Tschchartseriesbubblelinetype                            *int32                                     `protobuf:"varint,17,opt,name=tschchartseriesbubblelinetype" json:"tschchartseriesbubblelinetype,omitempty"`
+	Tschchartserieslinelinetype                              *int32                                     `protobuf:"varint,18,opt,name=tschchartserieslinelinetype" json:"tschchartserieslinelinetype,omitempty"`
+	Tschchartseriesmixedlinelinetype                         *int32                                     `protobuf:"varint,19,opt,name=tschchartseriesmixedlinelinetype" json:"tschchartseriesmixedlinelinetype,omitempty"`
+	Tschchartseriesscatterlinetype                           *int32                                     `protobuf:"varint,20,opt,name=tschchartseriesscatterlinetype" json:"tschchartseriesscatterlinetype,omitempty"`
+	Tschchartseriesdefaultnumberformat                       *TSK.FormatStructArchive                   `protobuf:"bytes,21,opt,name=tschchartseriesdefaultnumberformat" json:"tschchartseriesdefaultnumberformat,omitempty"`
+	Tschchartseriespienumberformat                           *TSK.FormatStructArchive                   `protobuf:"bytes,22,opt,name=tschchartseriespienumberformat" json:"tschchartseriespienumberformat,omitempty"`
+	Tschchartseriesdefaultnumberformattype                   *int32                                     `protobuf:"varint,23,opt,name=tschchartseriesdefaultnumberformattype" json:"tschchartseriesdefaultnumberformattype,omitempty"`
+	Tschchartseriespienumberformattype                       *int32                                     `protobuf:"varint,24,opt,name=tschchartseriespienumberformattype" json:"tschchartseriespienumberformattype,omitempty"`
+	Tschchartseriesstackedpercentnumberformat                *TSK.FormatStructArchive                   `protobuf:"bytes,25,opt,name=tschchartseriesstackedpercentnumberformat" json:"tschchartseriesstackedpercentnumberformat,omitempty"`
+	Tschchartseriesdefaultseriestype                         *int32                                     `protobuf:"varint,26,opt,name=tschchartseriesdefaultseriestype" json:"tschchartseriesdefaultseriestype,omitempty"`
+	Tschchartseriesdefaultshowerrorbar                       *bool                                      `protobuf:"varint,27,opt,name=tschchartseriesdefaultshowerrorbar" json:"tschchartseriesdefaultshowerrorbar,omitempty"`
+	Tschchartseriesdefaultshowerrorbarscatterx               *bool                                      `protobuf:"varint,28,opt,name=tschchartseriesdefaultshowerrorbarscatterx" json:"tschchartseriesdefaultshowerrorbarscatterx,omitempty"`
+	Tschchartseriesscattershowline                           *bool                                      `protobuf:"varint,29,opt,name=tschchartseriesscattershowline" json:"tschchartseriesscattershowline,omitempty"`
+	Tschchartseriesbubbleshownegativedata                    *bool                                      `protobuf:"varint,30,opt,name=tschchartseriesbubbleshownegativedata" json:"tschchartseriesbubbleshownegativedata,omitempty"`
+	Tschchartseriespieshowserieslabels                       *bool                                      `protobuf:"varint,31,opt,name=tschchartseriespieshowserieslabels" json:"tschchartseriespieshowserieslabels,omitempty"`
+	Tschchartseriesareashowsymbol                            *bool                                      `protobuf:"varint,32,opt,name=tschchartseriesareashowsymbol" json:"tschchartseriesareashowsymbol,omitempty"`
+	Tschchartserieslineshowsymbol                            *bool                                      `protobuf:"varint,33,opt,name=tschchartserieslineshowsymbol" json:"tschchartserieslineshowsymbol,omitempty"`
+	Tschchartseriesmixedareashowsymbol                       *bool                                      `protobuf:"varint,34,opt,name=tschchartseriesmixedareashowsymbol" json:"tschchartseriesmixedareashowsymbol,omitempty"`
+	Tschchartseriesmixedlineshowsymbol                       *bool                                      `protobuf:"varint,35,opt,name=tschchartseriesmixedlineshowsymbol" json:"tschchartseriesmixedlineshowsymbol,omitempty"`
+	Tschchartseriesscattershowsymbol                         *bool                                      `protobuf:"varint,36,opt,name=tschchartseriesscattershowsymbol" json:"tschchartseriesscattershowsymbol,omitempty"`
+	Tschchartseriesdefaultshowtrendline                      *bool                                      `protobuf:"varint,37,opt,name=tschchartseriesdefaultshowtrendline" json:"tschchartseriesdefaultshowtrendline,omitempty"`
+	Tschchartseriesareashowvaluelabels                       *bool                                      `protobuf:"varint,38,opt,name=tschchartseriesareashowvaluelabels" json:"tschchartseriesareashowvaluelabels,omitempty"`
+	Tschchartseriesbarshowvaluelabels                        *bool                                      `protobuf:"varint,39,opt,name=tschchartseriesbarshowvaluelabels" json:"tschchartseriesbarshowvaluelabels,omitempty"`
+	Tschchartseriesbubbleshowvaluelabels                     *bool                                      `protobuf:"varint,40,opt,name=tschchartseriesbubbleshowvaluelabels" json:"tschchartseriesbubbleshowvaluelabels,omitempty"`
+	Tschchartseriesdefaultshowvaluelabels                    *bool                                      `protobuf:"varint,41,opt,name=tschchartseriesdefaultshowvaluelabels" json:"tschchartseriesdefaultshowvaluelabels,omitempty"`
+	Tschchartserieslineshowvaluelabels                       *bool                                      `protobuf:"varint,42,opt,name=tschchartserieslineshowvaluelabels" json:"tschchartserieslineshowvaluelabels,omitempty"`
+	Tschchartseriesmixedshowvaluelabels                      *bool                                      `protobuf:"varint,43,opt,name=tschchartseriesmixedshowvaluelabels" json:"tschchartseriesmixedshowvaluelabels,omitempty"`
+	Tschchartseriespieshowvaluelabels                        *bool                                      `protobuf:"varint,44,opt,name=tschchartseriespieshowvaluelabels" json:"tschchartseriespieshowvaluelabels,omitempty"`
+	Tschchartseriesscattershowvaluelabels                    *bool                                      `protobuf:"varint,45,opt,name=tschchartseriesscattershowvaluelabels" json:"tschchartseriesscattershowvaluelabels,omitempty"`
+	Tschchartseriesbubblesizedimension                       *int32                                     `protobuf:"varint,46,opt,name=tschchartseriesbubblesizedimension" json:"tschchartseriesbubblesizedimension,omitempty"`
+	Tschchartseriesareasymboltype                            *int32                                     `protobuf:"varint,47,opt,name=tschchartseriesareasymboltype" json:"tschchartseriesareasymboltype,omitempty"`
+	Tschchartserieslinesymboltype                            *int32                                     `protobuf:"varint,48,opt,name=tschchartserieslinesymboltype" json:"tschchartserieslinesymboltype,omitempty"`
+	Tschchartseriesmixedareasymboltype                       *int32                                     `protobuf:"varint,49,opt,name=tschchartseriesmixedareasymboltype" json:"tschchartseriesmixedareasymboltype,omitempty"`
+	Tschchartseriesmixedlinesymboltype                       *int32                                     `protobuf:"varint,50,opt,name=tschchartseriesmixedlinesymboltype" json:"tschchartseriesmixedlinesymboltype,omitempty"`
+	Tschchartseriesscattersymboltype                         *int32                                     `protobuf:"varint,51,opt,name=tschchartseriesscattersymboltype" json:"tschchartseriesscattersymboltype,omitempty"`
+	Tschchartseriesdefaulttrendlineequationoffsetx           *float32                                   `protobuf:"fixed32,52,opt,name=tschchartseriesdefaulttrendlineequationoffsetx" json:"tschchartseriesdefaulttrendlineequationoffsetx,omitempty"`
+	Tschchartseriesdefaulttrendlineequationoffsety           *float32                                   `protobuf:"fixed32,53,opt,name=tschchartseriesdefaulttrendlineequationoffsety" json:"tschchartseriesdefaulttrendlineequationoffsety,omitempty"`
+	Tschchartseriesdefaulttrendlinelabelstring               *string                                    `protobuf:"bytes,54,opt,name=tschchartseriesdefaulttrendlinelabelstring" json:"tschchartseriesdefaulttrendlinelabelstring,omitempty"`
+	Tschchartseriesdefaulttrendlineorder                     *int32                                     `protobuf:"varint,55,opt,name=tschchartseriesdefaulttrendlineorder" json:"tschchartseriesdefaulttrendlineorder,omitempty"`
+	Tschchartseriesdefaulttrendlineperiod                    *int32                                     `protobuf:"varint,56,opt,name=tschchartseriesdefaulttrendlineperiod" json:"tschchartseriesdefaulttrendlineperiod,omitempty"`
+	Tschchartseriesdefaulttrendlinersquaredoffsetx           *float32                                   `protobuf:"fixed32,57,opt,name=tschchartseriesdefaulttrendlinersquaredoffsetx" json:"tschchartseriesdefaulttrendlinersquaredoffsetx,omitempty"`
+	Tschchartseriesdefaulttrendlinersquaredoffsety           *float32                                   `protobuf:"fixed32,58,opt,name=tschchartseriesdefaulttrendlinersquaredoffsety" json:"tschchartseriesdefaulttrendlinersquaredoffsety,omitempty"`
+	Tschchartseriesdefaulttrendlineshowequation              *bool                                      `protobuf:"varint,59,opt,name=tschchartseriesdefaulttrendlineshowequation" json:"tschchartseriesdefaulttrendlineshowequation,omitempty"`
+	Tschchartseriesdefaulttrendlineshowlabel                 *bool                                      `protobuf:"varint,60,opt,name=tschchartseriesdefaulttrendlineshowlabel" json:"tschchartseriesdefaulttrendlineshowlabel,omitempty"`
+	Tschchartseriesdefaulttrendlineshowr2Value               *bool                                      `protobuf:"varint,61,opt,name=tschchartseriesdefaulttrendlineshowr2value" json:"tschchartseriesdefaulttrendlineshowr2value,omitempty"`
+	Tschchartseriesdefaulttrendlinetype                      *int32                                     `protobuf:"varint,62,opt,name=tschchartseriesdefaulttrendlinetype" json:"tschchartseriesdefaulttrendlinetype,omitempty"`
+	Tschchartseriespiewedgeexplosion                         *float32                                   `protobuf:"fixed32,63,opt,name=tschchartseriespiewedgeexplosion" json:"tschchartseriespiewedgeexplosion,omitempty"`
+	Tschchartseriesdefaultyaxisordinal                       *int32                                     `protobuf:"varint,64,opt,name=tschchartseriesdefaultyaxisordinal" json:"tschchartseriesdefaultyaxisordinal,omitempty"`
+	Tschchartseriesbubbleshowserieslabels                    *bool                                      `protobuf:"varint,65,opt,name=tschchartseriesbubbleshowserieslabels" json:"tschchartseriesbubbleshowserieslabels,omitempty"`
+	Tschchartseriesbubblevaluelabelsaxis                     *int32                                     `protobuf:"varint,66,opt,name=tschchartseriesbubblevaluelabelsaxis" json:"tschchartseriesbubblevaluelabelsaxis,omitempty"`
+	Tschchartseriesscattershowserieslabels                   *bool                                      `protobuf:"varint,67,opt,name=tschchartseriesscattershowserieslabels" json:"tschchartseriesscattershowserieslabels,omitempty"`
+	Tschchartseriesscattervaluelabelsaxis                    *int32                                     `protobuf:"varint,68,opt,name=tschchartseriesscattervaluelabelsaxis" json:"tschchartseriesscattervaluelabelsaxis,omitempty"`
+	XXX_unrecognized                                         []byte                                     `json:"-"`
 }
 
 func (m *ChartSeriesNonStyleArchive) Reset()         { *m = ChartSeriesNonStyleArchive{} }
@@ -1837,28 +1843,28 @@ func (m *ChartSeriesNonStyleArchive) GetTschchartseriesbubbleadjustmentscale() f
 	return 0
 }
 
-func (m *ChartSeriesNonStyleArchive) GetTschchartseriesdefaulterrorbarcustomnegativedata() *TSCH1.ChartsNSArrayOfNSNumberDoubleArchive {
+func (m *ChartSeriesNonStyleArchive) GetTschchartseriesdefaulterrorbarcustomnegativedata() *TSCH.ChartsNSArrayOfNSNumberDoubleArchive {
 	if m != nil {
 		return m.Tschchartseriesdefaulterrorbarcustomnegativedata
 	}
 	return nil
 }
 
-func (m *ChartSeriesNonStyleArchive) GetTschchartseriesdefaulterrorbarcustomnegativedatascatterx() *TSCH1.ChartsNSArrayOfNSNumberDoubleArchive {
+func (m *ChartSeriesNonStyleArchive) GetTschchartseriesdefaulterrorbarcustomnegativedatascatterx() *TSCH.ChartsNSArrayOfNSNumberDoubleArchive {
 	if m != nil {
 		return m.Tschchartseriesdefaulterrorbarcustomnegativedatascatterx
 	}
 	return nil
 }
 
-func (m *ChartSeriesNonStyleArchive) GetTschchartseriesdefaulterrorbarcustompositivedata() *TSCH1.ChartsNSArrayOfNSNumberDoubleArchive {
+func (m *ChartSeriesNonStyleArchive) GetTschchartseriesdefaulterrorbarcustompositivedata() *TSCH.ChartsNSArrayOfNSNumberDoubleArchive {
 	if m != nil {
 		return m.Tschchartseriesdefaulterrorbarcustompositivedata
 	}
 	return nil
 }
 
-func (m *ChartSeriesNonStyleArchive) GetTschchartseriesdefaulterrorbarcustompositivedatascatterx() *TSCH1.ChartsNSArrayOfNSNumberDoubleArchive {
+func (m *ChartSeriesNonStyleArchive) GetTschchartseriesdefaulterrorbarcustompositivedatascatterx() *TSCH.ChartsNSArrayOfNSNumberDoubleArchive {
 	if m != nil {
 		return m.Tschchartseriesdefaulterrorbarcustompositivedatascatterx
 	}
@@ -2307,7 +2313,7 @@ func (m *ChartSeriesNonStyleArchive) GetTschchartseriesscattervaluelabelsaxis() 
 }
 
 var E_ChartSeriesNonStyleArchive_Current = &proto.ExtensionDesc{
-	ExtendedType:  (*TSCH1.ChartSeriesNonStyleArchive)(nil),
+	ExtendedType:  (*TSCH.ChartSeriesNonStyleArchive)(nil),
 	ExtensionType: (*ChartSeriesNonStyleArchive)(nil),
 	Field:         10000,
 	Name:          "TSCH.Generated.ChartSeriesNonStyleArchive.current",
