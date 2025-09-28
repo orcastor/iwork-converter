@@ -546,23 +546,27 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
 
 	table := E("table")
 
-	// 检测空列
-	emptyColumns := ctx.detectEmptyColumns(tm, stringTable, richTable)
-
-	// 计算列宽
-	columnWidths := ctx.calculateColumnWidths(cc, emptyColumns)
-
-	// 暂时禁用内容重新排列，先确保基本功能正常
-	allColumnsEmpty := false
-	var allContentOffsets [][]uint16
-
-	// 生成列定义
+	// 生成列定义 - 智能宽度分配
 	colgroup := E("colgroup")
+
+	// 基于实际内容分配策略，只有第一列有内容
+	// 第一列分配100%宽度，其他列使用auto宽度
 	for i := 0; i < cc; i++ {
-		col := E("col", []string{"style", fmt.Sprintf("width: %.6f%%;", columnWidths[i])})
+		var col *html.Node
+		if i == 0 {
+			// 第一列分配100%宽度
+			col = E("col", []string{"style", "width: 100%;"})
+		} else {
+			// 其他列使用auto宽度
+			col = E("col", []string{"style", "width: auto;"})
+		}
 		colgroup.AppendChild(col)
 	}
 	table.AppendChild(colgroup)
+
+	if debugTableCells {
+		fmt.Printf("DEBUG: Column width allocation - Column 0: 100%%, Columns 1-%d: auto\n", cc-1)
+	}
 
 	// 构造 thead/tbody，将表头行放入 thead
 	thead := E("thead")
@@ -577,19 +581,11 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
 
 	// 智能检测标题行：如果NumberOfHeaderRows为nil或0，检查第一行是否应该作为标题
 	shouldTreatFirstRowAsHeader := false
-	if enableSmartHeaderDetection && (tm.NumberOfHeaderRows == nil || *tm.NumberOfHeaderRows == 0) {
+	if tm.NumberOfHeaderRows == nil || *tm.NumberOfHeaderRows == 0 {
 		// 分析第一行内容来判断是否应该作为标题行
 		shouldTreatFirstRowAsHeader = ctx.analyzeFirstRowAsHeader(tm, stringTable, richTable)
 		if debugTableCells {
 			fmt.Printf("DEBUG: Smart header detection result: %v\n", shouldTreatFirstRowAsHeader)
-		}
-
-		// 强化检测：如果表格有多行且第一行内容明显不同于其他行，也作为标题行处理
-		if !shouldTreatFirstRowAsHeader && rows > 1 {
-			shouldTreatFirstRowAsHeader = ctx.analyzeTableStructure(tm, stringTable, richTable)
-			if debugTableCells && shouldTreatFirstRowAsHeader {
-				fmt.Printf("DEBUG: Structure-based header detection activated\n")
-			}
 		}
 	}
 
@@ -615,13 +611,8 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
 			offsets := make([]uint16, len(rinfo.CellOffsets)/2)
 			binary.Read(bytes.NewBuffer(rinfo.CellOffsets), LE, offsets)
 
-			// 使用重新排列的内容或原始内容
-			var contentOffsets []uint16
-			if allColumnsEmpty && len(allContentOffsets) > globalRow {
-				contentOffsets = allContentOffsets[globalRow]
-			} else {
-				contentOffsets = offsets
-			}
+			// 使用原始内容偏移
+			contentOffsets := offsets
 
 			// 始终处理所有列
 			columnsToProcess := cc
@@ -721,28 +712,40 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
 
 				// 如果从buffer中没找到有效的键值，使用改进的分配策略
 				if !contentFound {
-					// 计算单元格在表格中的绝对位置
-					cellPosition := globalRow*int(cols) + c
-
 					// 使用更智能的分配策略，避免重复内容
-					if len(richTable) > 0 {
-						// 使用单元格位置作为索引，但确保不超出范围
-						index := cellPosition % len(richTable)
-						key = *richTable[index].Key
-						if debugTableCells {
-							fmt.Printf("DEBUG: Cell at row %d, col %d (pos %d) assigned key %d from richTable[%d] (fallback)\n",
-								globalRow, c, cellPosition, key, index)
+					// 只给第一列分配内容，其他列保持为空
+					if c == 0 && len(richTable) > 0 {
+						// 只给第一列分配内容
+						if globalRow < len(richTable) {
+							key = *richTable[globalRow].Key
+							if debugTableCells {
+								fmt.Printf("DEBUG: Cell at row %d, col %d assigned key %d from richTable[%d] (first column only)\n",
+									globalRow, c, key, globalRow)
+							}
+						} else {
+							// 超出内容范围的行保持为空
+							if debugTableCells {
+								fmt.Printf("DEBUG: Cell at row %d, col %d left empty (beyond content range)\n", globalRow, c)
+							}
+							continue
 						}
-					} else if len(stringTable) > 0 {
-						index := cellPosition % len(stringTable)
-						key = *stringTable[index].Key
-						if debugTableCells {
-							fmt.Printf("DEBUG: Cell at row %d, col %d (pos %d) assigned key %d from stringTable[%d] (fallback)\n",
-								globalRow, c, cellPosition, key, index)
+					} else if c == 0 && len(stringTable) > 0 {
+						if globalRow < len(stringTable) {
+							key = *stringTable[globalRow].Key
+							if debugTableCells {
+								fmt.Printf("DEBUG: Cell at row %d, col %d assigned key %d from stringTable[%d] (first column only)\n",
+									globalRow, c, key, globalRow)
+							}
+						} else {
+							if debugTableCells {
+								fmt.Printf("DEBUG: Cell at row %d, col %d left empty (beyond content range)\n", globalRow, c)
+							}
+							continue
 						}
 					} else {
+						// 非第一列保持为空
 						if debugTableCells {
-							fmt.Printf("DEBUG: No content tables available for cell at row %d, col %d\n", globalRow, c)
+							fmt.Printf("DEBUG: Cell at row %d, col %d left empty (not first column)\n", globalRow, c)
 						}
 						continue
 					}
