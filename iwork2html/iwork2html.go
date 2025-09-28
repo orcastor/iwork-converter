@@ -67,7 +67,7 @@ type Context struct {
 }
 
 // 控制是否输出表格单元格的调试日志
-var debugTableCells = false
+var debugTableCells = true
 
 type Attachment struct {
 	pos  uint32
@@ -255,6 +255,73 @@ func (ctx *Context) applyPositionBasedStyle(tm *TST.TableModelArchive, globalRow
 	return style
 }
 
+// analyzeFirstRowAsHeader 分析第一行内容，判断是否应该作为标题行
+func (ctx *Context) analyzeFirstRowAsHeader(tm *TST.TableModelArchive, stringTable []*TST.TableDataList_ListEntry, richTable []*TST.TableDataList_ListEntry) bool {
+	if tm.DataStore == nil || tm.DataStore.Tiles == nil || len(tm.DataStore.Tiles.Tiles) == 0 {
+		return false
+	}
+	
+	// 获取第一个tile的第一行
+	firstTileInfo := tm.DataStore.Tiles.Tiles[0]
+	firstTile := ctx.ix.Deref(firstTileInfo.Tile).(*TST.Tile)
+	if len(firstTile.RowInfos) == 0 {
+		return false
+	}
+	
+	firstRowInfo := firstTile.RowInfos[0]
+	
+	// 解码第一行的 column -> offset 映射
+	offsets := make([]uint16, len(firstRowInfo.CellOffsets)/2)
+	binary.Read(bytes.NewBuffer(firstRowInfo.CellOffsets), LE, offsets)
+	
+	// 分析第一行的内容特征
+	nonEmptyCells := 0
+	textCells := 0
+	
+	for _, offset := range offsets {
+		if offset == 65535 { // 空单元格
+			continue
+		}
+		
+		nonEmptyCells++
+		
+		// 检查是否为文本内容
+		if ctx.isTextCell(offset, stringTable, richTable) {
+			textCells++
+		}
+	}
+	
+	// 如果第一行有内容且大部分是文本，则认为是标题行
+	if nonEmptyCells > 0 && float64(textCells)/float64(nonEmptyCells) >= 0.5 {
+		if debugTableCells {
+			fmt.Printf("DEBUG: First row analysis - nonEmpty: %d, text: %d, ratio: %.2f\n", 
+				nonEmptyCells, textCells, float64(textCells)/float64(nonEmptyCells))
+		}
+		return true
+	}
+	
+	return false
+}
+
+// isTextCell 检查给定offset的单元格是否包含文本内容
+func (ctx *Context) isTextCell(offset uint16, stringTable []*TST.TableDataList_ListEntry, richTable []*TST.TableDataList_ListEntry) bool {
+	// 尝试在字符串表中查找
+	for _, entry := range stringTable {
+		if entry.Key != nil && *entry.Key == uint32(offset) && entry.String_ != nil && *entry.String_ != "" {
+			return true
+		}
+	}
+	
+	// 尝试在富文本表中查找
+	for _, entry := range richTable {
+		if entry.Key != nil && *entry.Key == uint32(offset) && entry.RichTextPayload != nil {
+			return true
+		}
+	}
+	
+	return false
+}
+
 func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
 	rows := uint32(0)
 	cols := uint32(0)
@@ -266,6 +333,11 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
 	}
 	if debugTableCells {
 		fmt.Printf("DEBUG: Processing table with %d rows, %d columns (pointers: %p, %p)\n", rows, cols, tm.NumberOfRows, tm.NumberOfColumns)
+		if tm.NumberOfHeaderRows != nil {
+			fmt.Printf("DEBUG: NumberOfHeaderRows = %d\n", *tm.NumberOfHeaderRows)
+		} else {
+			fmt.Printf("DEBUG: NumberOfHeaderRows is nil\n")
+		}
 	}
 	// 提取字符串和富文本表
 	var stringTable []*TST.TableDataList_ListEntry
@@ -362,8 +434,68 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
 				}
 				// 有内容的类型：数字/日期/布尔/字符串/富文本
 				if cellType == 0 {
-					// 即使是空单元格，也标记该列为活跃，因为它有结构
-					activeColumns[c] = true
+					// 对于空单元格，检查是否真正有内容
+					found := false
+					var key uint32
+					
+					// 尝试多个可能的键值位置
+					keyPositions := []int{int(offset), 0, 4, 8, int(offset)+4}
+					for _, pos := range keyPositions {
+						if pos+4 <= len(rinfo.CellStorageBuffer) {
+							testKey := LE.Uint32(rinfo.CellStorageBuffer[pos : pos+4])
+							
+							// 检查键值是否在字符串表或富文本表中存在
+							for _, entry := range stringTable {
+								if *entry.Key == testKey {
+									found = true
+									key = testKey
+									break
+								}
+							}
+							if !found {
+								for _, entry := range richTable {
+									if *entry.Key == testKey {
+										found = true
+										key = testKey
+										break
+									}
+								}
+							}
+							
+							// 如果原始键值不存在且键值大于0，尝试有限的偏移
+							if !found && testKey > 0 && testKey <= 10 {
+								if testKey >= 1 {
+									tryKey := testKey - 1
+									for _, entry := range stringTable {
+										if *entry.Key == tryKey {
+											found = true
+											key = tryKey
+											break
+										}
+									}
+									if !found {
+										for _, entry := range richTable {
+											if *entry.Key == tryKey {
+												found = true
+												key = tryKey
+												break
+											}
+										}
+									}
+								}
+							}
+							
+							if found {
+								break
+							}
+						}
+					}
+					
+					// 只有找到有效内容时才标记该列为活跃
+					if found && key > 0 {
+						activeColumns[c] = true
+						hasAnyContent = true
+					}
 					continue
 				}
 				activeColumns[c] = true
@@ -408,13 +540,32 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
 	table.AppendChild(tbody)
 
 	// 使用全局行号跨 tile 判断表头/表尾，并正确解析/填充每个单元格
+	// 添加键值使用跟踪，避免重复内容
+	usedKeys := make(map[uint32]bool)
 	globalRow := 0
+	
+	// 智能检测标题行：如果NumberOfHeaderRows为nil或0，检查第一行是否应该作为标题
+	shouldTreatFirstRowAsHeader := false
+	if tm.NumberOfHeaderRows == nil || *tm.NumberOfHeaderRows == 0 {
+		// 分析第一行内容来判断是否应该作为标题行
+		shouldTreatFirstRowAsHeader = ctx.analyzeFirstRowAsHeader(tm, stringTable, richTable)
+		if debugTableCells {
+			fmt.Printf("DEBUG: Smart header detection result: %v\n", shouldTreatFirstRowAsHeader)
+		}
+	}
+	
 	for _, tinfo := range tm.DataStore.Tiles.Tiles {
 		tile := ctx.ix.Deref(tinfo.Tile).(*TST.Tile)
 		for _, rinfo := range tile.RowInfos {
 			tr := E("tr")
-			// 表头行依据全局行号判断
-			isHeaderRow := tm.NumberOfHeaderRows != nil && globalRow < int(*tm.NumberOfHeaderRows)
+			// 表头行依据全局行号判断，或智能检测结果
+			isHeaderRow := false
+			if tm.NumberOfHeaderRows != nil && globalRow < int(*tm.NumberOfHeaderRows) {
+				isHeaderRow = true
+			} else if shouldTreatFirstRowAsHeader && globalRow == 0 {
+				isHeaderRow = true
+			}
+			
 			if isHeaderRow {
 				thead.AppendChild(tr)
 			} else {
@@ -485,17 +636,17 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
 
 				switch cellType {
 				case 0:
-					// 空白单元格：仅尝试原始键读取，避免启发式回填导致重复内容
+					// 空白单元格：只有在特定条件下才尝试键值偏移
 					if debugTableCells {
-						fmt.Printf("DEBUG: Empty cell at row %d, col %d - try original key only\n", globalRow, c)
+						fmt.Printf("DEBUG: Empty cell at row %d, col %d - checking if truly empty\n", globalRow, c)
 					}
 
 					// 尝试在不同位置读取键值，找到有效的内容
 					found := false
 					var key uint32
 					
-					// 尝试多个可能的键值位置
-					keyPositions := []int{0, 4, 8, int(offset), int(offset)+4, int(offset)+8}
+					// 尝试多个可能的键值位置，但限制偏移尝试
+					keyPositions := []int{o, 0, 4, 8, int(offset), int(offset)+4}
 					for _, pos := range keyPositions {
 						if pos+4 <= len(rinfo.CellStorageBuffer) {
 							testKey := LE.Uint32(rinfo.CellStorageBuffer[pos : pos+4])
@@ -503,59 +654,89 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
 								fmt.Printf("DEBUG: Testing key at position %d: %d\n", pos, testKey)
 							}
 							
-							// 检查这个键是否在 stringTable 或 richTable 中存在
-							// 同时尝试键值偏移（可能有偏移量）
+							// 首先检查原始键值是否存在且未被使用
 							keyExists := false
-							actualKey := testKey
-							offsets := []uint32{0, 1, 2, 3} // 尝试不同的偏移
-							
-							for _, offset := range offsets {
-								if testKey >= offset {
-									tryKey := testKey - offset
-									for _, entry := range stringTable {
-										if *entry.Key == tryKey {
-											keyExists = true
-											actualKey = tryKey
-											if debugTableCells {
-												fmt.Printf("DEBUG: Found string match with offset %d: buffer_key=%d -> table_key=%d\n", offset, testKey, tryKey)
-											}
-											break
-										}
+							for _, entry := range stringTable {
+								if *entry.Key == testKey && !usedKeys[testKey] {
+									keyExists = true
+									key = testKey
+									found = true
+									usedKeys[testKey] = true
+									if debugTableCells {
+										fmt.Printf("DEBUG: Found direct string match: key=%d\n", testKey)
 									}
-									if !keyExists {
-										for _, entry := range richTable {
-											if *entry.Key == tryKey {
-												keyExists = true
-												actualKey = tryKey
-												if debugTableCells {
-													fmt.Printf("DEBUG: Found rich text match with offset %d: buffer_key=%d -> table_key=%d\n", offset, testKey, tryKey)
-												}
-												break
-											}
+									break
+								}
+							}
+							if !keyExists {
+								for _, entry := range richTable {
+									if *entry.Key == testKey && !usedKeys[testKey] {
+										keyExists = true
+										key = testKey
+										found = true
+										usedKeys[testKey] = true
+										if debugTableCells {
+											fmt.Printf("DEBUG: Found direct rich text match: key=%d\n", testKey)
 										}
-									}
-									if keyExists {
 										break
 									}
 								}
 							}
 							
-							if keyExists {
-								key = actualKey
+							// 只有在原始键值不存在且键值大于0时，才尝试有限的偏移
+							if !keyExists && testKey > 0 && testKey <= 10 { // 限制键值范围，避免过大的无效键值
 								if debugTableCells {
-									fmt.Printf("DEBUG: Found valid key %d at position %d (original buffer key: %d)\n", actualKey, pos, testKey)
+									fmt.Printf("DEBUG: Original key %d not found, trying limited offset\n", testKey)
+								}
+								
+								// 只尝试偏移1，避免过度匹配
+								if testKey >= 1 {
+									tryKey := testKey - 1
+									if !usedKeys[tryKey] {
+										for _, entry := range stringTable {
+											if *entry.Key == tryKey {
+												keyExists = true
+												key = tryKey
+												found = true
+												usedKeys[tryKey] = true
+												if debugTableCells {
+													fmt.Printf("DEBUG: Found string match with offset 1: buffer_key=%d -> table_key=%d\n", testKey, tryKey)
+												}
+												break
+											}
+										}
+										if !keyExists {
+											for _, entry := range richTable {
+												if *entry.Key == tryKey {
+													keyExists = true
+													key = tryKey
+													found = true
+													usedKeys[tryKey] = true
+													if debugTableCells {
+														fmt.Printf("DEBUG: Found rich text match with offset 1: buffer_key=%d -> table_key=%d\n", testKey, tryKey)
+													}
+													break
+												}
+											}
+										}
+									}
+								}
+							}
+							
+							if keyExists {
+								if debugTableCells {
+									fmt.Printf("DEBUG: Found valid key %d at position %d\n", key, pos)
 								}
 								break
 							}
 						}
 					}
 					
-					if key > 0 {
+					if found && key > 0 {
 						// 字符串表
 						for _, entry := range stringTable {
 							if *entry.Key == key {
 								td.AppendChild(T(*entry.String_))
-								found = true
 								if debugTableCells {
 									fmt.Printf("DEBUG: Empty cell resolved via string key %d: %s\n", key, *entry.String_)
 								}
@@ -563,13 +744,12 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
 							}
 						}
 						// 富文本表
-						if !found {
+						if td.FirstChild == nil { // 只有在没有找到字符串内容时才尝试富文本
 							for _, entry := range richTable {
 								if *entry.Key == key {
 									if rt, ok := ctx.ix.Deref(entry.RichTextPayload).(*TST.RichTextPayloadArchive); ok {
 										if st, ok := ctx.ix.Deref(rt.Storage).(*TSWP.StorageArchive); ok && st != nil {
 											ctx.storageToNodeForTable(st, td)
-											found = true
 											if debugTableCells {
 												fmt.Printf("DEBUG: Empty cell resolved via rich text key %d\n", key)
 											}
