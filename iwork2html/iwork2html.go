@@ -15,7 +15,6 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/orcastor/iwork-converter/index"
 	"github.com/orcastor/iwork-converter/proto/KN"
@@ -69,12 +68,21 @@ type Context struct {
 // 控制是否输出表格单元格的调试日志
 var debugTableCells = true
 
+// 控制是否输出图片处理调试日志
+var debugImages = true
+
+// 控制是否启用智能表头检测
+var enableSmartHeaderDetection = false
+
 type Attachment struct {
 	pos  uint32
 	node *html.Node
 }
 
 func (ctx *Context) processImage(image *TSD.ImageArchive) *html.Node {
+	if debugImages {
+		fmt.Printf("DEBUG IMG: processing image, dataId=%d\n", *image.Data.Identifier)
+	}
 	dataId := *image.Data.Identifier
 	meta := ctx.ix.Records[2].(*TSP.PackageMetadata)
 	var src string
@@ -82,9 +90,15 @@ func (ctx *Context) processImage(image *TSD.ImageArchive) *html.Node {
 		if dataId == *data.Identifier {
 			if data.FileName != nil {
 				src = *data.FileName
+				if debugImages {
+					fmt.Printf("DEBUG IMG: use FileName=%s for dataId=%d\n", src, dataId)
+				}
 			} else {
 				fmt.Printf("No filename: %#v\n", data)
 				src = *data.PreferredFileName
+				if debugImages {
+					fmt.Printf("DEBUG IMG: use PreferredFileName=%s for dataId=%d\n", src, dataId)
+				}
 			}
 		}
 	}
@@ -92,6 +106,9 @@ func (ctx *Context) processImage(image *TSD.ImageArchive) *html.Node {
 	// not sure if this is px or pt.  It's px on the html side.
 	width := fmt.Sprintf("%f", *image.OriginalSize.Width)
 	height := fmt.Sprintf("%f", *image.OriginalSize.Height)
+	if debugImages {
+		fmt.Printf("DEBUG IMG: original size width=%s height=%s for src=%s\n", width, height, src)
+	}
 	return E("img", []string{"src", "", "width", width, "height", height, "class", "img_" + fmt.Sprint(dataId)})
 }
 
@@ -260,46 +277,73 @@ func (ctx *Context) analyzeFirstRowAsHeader(tm *TST.TableModelArchive, stringTab
 	if tm.DataStore == nil || tm.DataStore.Tiles == nil || len(tm.DataStore.Tiles.Tiles) == 0 {
 		return false
 	}
-	
+
 	// 获取第一个tile的第一行
 	firstTileInfo := tm.DataStore.Tiles.Tiles[0]
 	firstTile := ctx.ix.Deref(firstTileInfo.Tile).(*TST.Tile)
 	if len(firstTile.RowInfos) == 0 {
 		return false
 	}
-	
+
 	firstRowInfo := firstTile.RowInfos[0]
-	
+
 	// 解码第一行的 column -> offset 映射
 	offsets := make([]uint16, len(firstRowInfo.CellOffsets)/2)
 	binary.Read(bytes.NewBuffer(firstRowInfo.CellOffsets), LE, offsets)
-	
+
 	// 分析第一行的内容特征
 	nonEmptyCells := 0
 	textCells := 0
-	
+	hasHeaderStyle := false
+
 	for _, offset := range offsets {
 		if offset == 65535 { // 空单元格
 			continue
 		}
-		
+
 		nonEmptyCells++
-		
+
 		// 检查是否为文本内容
 		if ctx.isTextCell(offset, stringTable, richTable) {
 			textCells++
 		}
 	}
-	
-	// 如果第一行有内容且大部分是文本，则认为是标题行
-	if nonEmptyCells > 0 && float64(textCells)/float64(nonEmptyCells) >= 0.5 {
+
+	// 检查是否有表头行样式定义
+	if tm.HeaderRowStyle != nil {
+		hasHeaderStyle = true
 		if debugTableCells {
-			fmt.Printf("DEBUG: First row analysis - nonEmpty: %d, text: %d, ratio: %.2f\n", 
-				nonEmptyCells, textCells, float64(textCells)/float64(nonEmptyCells))
+			fmt.Printf("DEBUG: Table has HeaderRowStyle defined\n")
+		}
+	}
+
+	// 对于单列表格，如果第一行有任何内容，都认为是标题行
+	if len(offsets) == 1 && nonEmptyCells > 0 {
+		if debugTableCells {
+			fmt.Printf("DEBUG: Single column table with content in first row - treating as header\n")
 		}
 		return true
 	}
-	
+
+	// 更保守的标题行判断条件：
+	// 1. 如果有表头样式定义，更容易判断为标题行
+	// 2. 只有在明确的标题行特征时才判断为标题行
+	if nonEmptyCells > 0 {
+		threshold := 0.6 // 提高阈值，减少误判
+		if hasHeaderStyle {
+			threshold = 0.3 // 如果有表头样式，阈值稍低
+		}
+
+		// 如果第一行的内容都是文本，并且满足阈值要求，才认为是标题行
+		if float64(textCells)/float64(nonEmptyCells) >= threshold {
+			if debugTableCells {
+				fmt.Printf("DEBUG: First row analysis - nonEmpty: %d, text: %d, ratio: %.2f (threshold: %.2f, hasHeaderStyle: %v)\n",
+					nonEmptyCells, textCells, float64(textCells)/float64(nonEmptyCells), threshold, hasHeaderStyle)
+			}
+			return true
+		}
+	}
+
 	return false
 }
 
@@ -311,15 +355,67 @@ func (ctx *Context) isTextCell(offset uint16, stringTable []*TST.TableDataList_L
 			return true
 		}
 	}
-	
+
 	// 尝试在富文本表中查找
 	for _, entry := range richTable {
 		if entry.Key != nil && *entry.Key == uint32(offset) && entry.RichTextPayload != nil {
 			return true
 		}
 	}
-	
+
 	return false
+}
+
+// analyzeTableStructure 分析表格结构，判断第一行是否应该作为标题行
+func (ctx *Context) analyzeTableStructure(tm *TST.TableModelArchive, stringTable []*TST.TableDataList_ListEntry, richTable []*TST.TableDataList_ListEntry) bool {
+	if tm.DataStore == nil || tm.DataStore.Tiles == nil || len(tm.DataStore.Tiles.Tiles) == 0 {
+		return false
+	}
+
+	firstTile := ctx.ix.Deref(tm.DataStore.Tiles.Tiles[0].Tile).(*TST.Tile)
+	if len(firstTile.RowInfos) < 2 {
+		return false // 需要至少两行才能比较
+	}
+
+	// 分析前两行的内容密度差异
+	firstRowContent := ctx.getRowContentDensity(firstTile.RowInfos[0], stringTable, richTable)
+	secondRowContent := ctx.getRowContentDensity(firstTile.RowInfos[1], stringTable, richTable)
+
+	if debugTableCells {
+		fmt.Printf("DEBUG: Structure analysis - first row density: %.2f, second row density: %.2f\n",
+			firstRowContent, secondRowContent)
+	}
+
+	// 更严格的条件：只有在第一行内容密度明显高于第二行时才判断为标题行
+	if firstRowContent > 0.5 && firstRowContent > secondRowContent*2.0 {
+		return true
+	}
+
+	// 更严格的条件：第一行内容丰富且第二行基本为空
+	if firstRowContent > 0.7 && secondRowContent < 0.1 {
+		return true
+	}
+
+	return false
+}
+
+// getRowContentDensity 计算行的内容密度（非空单元格比例）
+func (ctx *Context) getRowContentDensity(rowInfo *TST.TileRowInfo, stringTable []*TST.TableDataList_ListEntry, richTable []*TST.TableDataList_ListEntry) float64 {
+	offsets := make([]uint16, len(rowInfo.CellOffsets)/2)
+	binary.Read(bytes.NewBuffer(rowInfo.CellOffsets), LE, offsets)
+
+	nonEmptyCells := 0
+	for _, offset := range offsets {
+		if offset != 65535 && ctx.isTextCell(offset, stringTable, richTable) {
+			nonEmptyCells++
+		}
+	}
+
+	if len(offsets) == 0 {
+		return 0
+	}
+
+	return float64(nonEmptyCells) / float64(len(offsets))
 }
 
 func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
@@ -337,6 +433,16 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
 			fmt.Printf("DEBUG: NumberOfHeaderRows = %d\n", *tm.NumberOfHeaderRows)
 		} else {
 			fmt.Printf("DEBUG: NumberOfHeaderRows is nil\n")
+		}
+		fmt.Printf("DEBUG: Smart header detection enabled: %v\n", enableSmartHeaderDetection)
+
+		// 检查数据存储结构
+		if tm.DataStore != nil && tm.DataStore.Tiles != nil {
+			fmt.Printf("DEBUG: DataStore has %d tiles\n", len(tm.DataStore.Tiles.Tiles))
+			for i, tinfo := range tm.DataStore.Tiles.Tiles {
+				tile := ctx.ix.Deref(tinfo.Tile).(*TST.Tile)
+				fmt.Printf("DEBUG: Tile %d has %d rows\n", i, len(tile.RowInfos))
+			}
 		}
 	}
 	// 提取字符串和富文本表
@@ -411,104 +517,10 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
 
 	cc := int(*tm.NumberOfColumns)
 
-	// 扫描所有单元格，找出有内容的列（通过正确解析 RowInfo/CellStorage）
+	// 简化：始终显示所有列，不进行活跃列扫描
 	activeColumns := make([]bool, cc)
-	hasAnyContent := false
-	for _, tinfo := range tm.DataStore.Tiles.Tiles {
-		tile := ctx.ix.Deref(tinfo.Tile).(*TST.Tile)
-		for _, rinfo := range tile.RowInfos {
-			// 解码该行的 column -> offset 映射
-			offsets := make([]uint16, len(rinfo.CellOffsets)/2)
-			binary.Read(bytes.NewBuffer(rinfo.CellOffsets), LE, offsets)
-			for c := 0; c < cc && c < len(offsets); c++ {
-				offset := offsets[c]
-				if offset == 65535 { // 空单元格
-					continue
-				}
-				// 解析单元格类型
-				var cellType int
-				if rinfo.CellStorageBuffer[offset] == 4 {
-					cellType = int(rinfo.CellStorageBuffer[offset+1])
-				} else {
-					cellType = int(rinfo.CellStorageBuffer[offset+2])
-				}
-				// 有内容的类型：数字/日期/布尔/字符串/富文本
-				if cellType == 0 {
-					// 对于空单元格，检查是否真正有内容
-					found := false
-					var key uint32
-					
-					// 尝试多个可能的键值位置
-					keyPositions := []int{int(offset), 0, 4, 8, int(offset)+4}
-					for _, pos := range keyPositions {
-						if pos+4 <= len(rinfo.CellStorageBuffer) {
-							testKey := LE.Uint32(rinfo.CellStorageBuffer[pos : pos+4])
-							
-							// 检查键值是否在字符串表或富文本表中存在
-							for _, entry := range stringTable {
-								if *entry.Key == testKey {
-									found = true
-									key = testKey
-									break
-								}
-							}
-							if !found {
-								for _, entry := range richTable {
-									if *entry.Key == testKey {
-										found = true
-										key = testKey
-										break
-									}
-								}
-							}
-							
-							// 如果原始键值不存在且键值大于0，尝试有限的偏移
-							if !found && testKey > 0 && testKey <= 10 {
-								if testKey >= 1 {
-									tryKey := testKey - 1
-									for _, entry := range stringTable {
-										if *entry.Key == tryKey {
-											found = true
-											key = tryKey
-											break
-										}
-									}
-									if !found {
-										for _, entry := range richTable {
-											if *entry.Key == tryKey {
-												found = true
-												key = tryKey
-												break
-											}
-										}
-									}
-								}
-							}
-							
-							if found {
-								break
-							}
-						}
-					}
-					
-					// 只有找到有效内容时才标记该列为活跃
-					if found && key > 0 {
-						activeColumns[c] = true
-						hasAnyContent = true
-					}
-					continue
-				}
-				activeColumns[c] = true
-				hasAnyContent = true
-			}
-		}
-	}
-
-	// 如果没有任何内容但有列定义，则激活所有列
-	if !hasAnyContent && cc > 0 {
-		for i := 0; i < cc; i++ {
-			activeColumns[i] = true
-		}
+	for i := 0; i < cc; i++ {
+		activeColumns[i] = true
 	}
 
 	// 计算有内容的列数
@@ -519,19 +531,38 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
 		}
 	}
 
-	table := E("table")
-	// 只为有内容的列生成列定义
-	if activeColumnCount > 0 {
-		colgroup := E("colgroup")
-		w := 100.0 / float64(activeColumnCount)
-		for i := 0; i < cc; i++ {
-			if activeColumns[i] {
-				col := E("col", []string{"style", fmt.Sprintf("width: %.6f%%;", w)})
-				colgroup.AppendChild(col)
+	// 智能表格结构检测：如果只有很少的列有内容，可能是表格结构错误
+	if debugTableCells {
+		fmt.Printf("DEBUG: Active columns: %d out of %d total columns\n", activeColumnCount, cc)
+		for i, active := range activeColumns {
+			if active {
+				fmt.Printf("DEBUG: Column %d is active\n", i)
 			}
 		}
-		table.AppendChild(colgroup)
 	}
+
+	// 关闭智能重构：始终按原始列数渲染
+	shouldRestructure := false
+
+	table := E("table")
+
+	// 检测空列
+	emptyColumns := ctx.detectEmptyColumns(tm, stringTable, richTable)
+
+	// 计算列宽
+	columnWidths := ctx.calculateColumnWidths(cc, emptyColumns)
+
+	// 暂时禁用内容重新排列，先确保基本功能正常
+	allColumnsEmpty := false
+	var allContentOffsets [][]uint16
+
+	// 生成列定义
+	colgroup := E("colgroup")
+	for i := 0; i < cc; i++ {
+		col := E("col", []string{"style", fmt.Sprintf("width: %.6f%%;", columnWidths[i])})
+		colgroup.AppendChild(col)
+	}
+	table.AppendChild(colgroup)
 
 	// 构造 thead/tbody，将表头行放入 thead
 	thead := E("thead")
@@ -540,20 +571,28 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
 	table.AppendChild(tbody)
 
 	// 使用全局行号跨 tile 判断表头/表尾，并正确解析/填充每个单元格
-	// 添加键值使用跟踪，避免重复内容
-	usedKeys := make(map[uint32]bool)
+	// 注意：移除键值使用跟踪，因为同一键值可能需要在多个单元格中使用
+	// usedKeys := make(map[uint32]bool) // 注释掉，避免阻止重复内容
 	globalRow := 0
-	
+
 	// 智能检测标题行：如果NumberOfHeaderRows为nil或0，检查第一行是否应该作为标题
 	shouldTreatFirstRowAsHeader := false
-	if tm.NumberOfHeaderRows == nil || *tm.NumberOfHeaderRows == 0 {
+	if enableSmartHeaderDetection && (tm.NumberOfHeaderRows == nil || *tm.NumberOfHeaderRows == 0) {
 		// 分析第一行内容来判断是否应该作为标题行
 		shouldTreatFirstRowAsHeader = ctx.analyzeFirstRowAsHeader(tm, stringTable, richTable)
 		if debugTableCells {
 			fmt.Printf("DEBUG: Smart header detection result: %v\n", shouldTreatFirstRowAsHeader)
 		}
+
+		// 强化检测：如果表格有多行且第一行内容明显不同于其他行，也作为标题行处理
+		if !shouldTreatFirstRowAsHeader && rows > 1 {
+			shouldTreatFirstRowAsHeader = ctx.analyzeTableStructure(tm, stringTable, richTable)
+			if debugTableCells && shouldTreatFirstRowAsHeader {
+				fmt.Printf("DEBUG: Structure-based header detection activated\n")
+			}
+		}
 	}
-	
+
 	for _, tinfo := range tm.DataStore.Tiles.Tiles {
 		tile := ctx.ix.Deref(tinfo.Tile).(*TST.Tile)
 		for _, rinfo := range tile.RowInfos {
@@ -565,7 +604,7 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
 			} else if shouldTreatFirstRowAsHeader && globalRow == 0 {
 				isHeaderRow = true
 			}
-			
+
 			if isHeaderRow {
 				thead.AppendChild(tr)
 			} else {
@@ -576,10 +615,18 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
 			offsets := make([]uint16, len(rinfo.CellOffsets)/2)
 			binary.Read(bytes.NewBuffer(rinfo.CellOffsets), LE, offsets)
 
-			for c := 0; c < cc; c++ {
-				if !activeColumns[c] {
-					continue
-				}
+			// 使用重新排列的内容或原始内容
+			var contentOffsets []uint16
+			if allColumnsEmpty && len(allContentOffsets) > globalRow {
+				contentOffsets = allContentOffsets[globalRow]
+			} else {
+				contentOffsets = offsets
+			}
+
+			// 始终处理所有列
+			columnsToProcess := cc
+
+			for c := 0; c < columnsToProcess; c++ {
 
 				// 检查是否为表头单元格
 				var cellTag string
@@ -590,295 +637,204 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
 				}
 
 				td := E(cellTag)
+
+				// 为表头添加默认样式
+				if isHeaderRow {
+					// 添加表头的基本样式类
+					td.Attr = append(td.Attr, html.Attribute{Key: "class", Val: "table-header"})
+				}
 				// 添加调试属性
 				td.Attr = append(td.Attr, html.Attribute{Key: "data-row", Val: fmt.Sprintf("%d", globalRow)})
-				td.Attr = append(td.Attr, html.Attribute{Key: "data-col", Val: fmt.Sprintf("%d", c)})
+				// 在重构模式下，所有单元格都是第0列
+				colIndex := c
+				if shouldRestructure {
+					colIndex = 0
+				}
+				td.Attr = append(td.Attr, html.Attribute{Key: "data-col", Val: fmt.Sprintf("%d", colIndex)})
 				tr.AppendChild(td)
 
-				// 应用基于位置的样式（表头/表尾/表体）
+				// 应用基于位置的样式（表头/表尾/表体），不再强制灰色背景
 				if s := ctx.applyPositionBasedStyle(tm, globalRow, c); s != "" {
 					td.Attr = append(td.Attr, html.Attribute{Key: "style", Val: s})
 				}
 
-				// 如果该列没有 offset，视为无内容
-				if c >= len(offsets) {
+				// 使用重新排列后的内容偏移
+				if c >= len(contentOffsets) {
 					continue
 				}
-				offset := offsets[c]
+				offset := contentOffsets[c]
 				if offset == 65535 { // 空单元格
 					continue
 				}
 
-				// 解析单元格类型和定位到数据/指针
-				var cellType int
-				if rinfo.CellStorageBuffer[offset] == 4 {
-					cellType = int(rinfo.CellStorageBuffer[offset+1])
-				} else {
-					cellType = int(rinfo.CellStorageBuffer[offset+2])
-				}
+				// 重新设计：简化的单元格内容获取逻辑
+				// 不再依赖复杂的cellType判断，直接尝试所有可能的内容获取方式
 				if debugTableCells {
-					fmt.Printf("DEBUG: Cell at row %d, col %d: offset=%d, buffer[offset]=%d, buffer[offset+1]=%d, buffer[offset+2]=%d, cellType=%d\n",
-						globalRow, c, offset, rinfo.CellStorageBuffer[offset], rinfo.CellStorageBuffer[offset+1], rinfo.CellStorageBuffer[offset+2], cellType)
-				}
-
-				// 如果cellType为0但我们知道有内容，尝试强制处理
-				if cellType == 0 {
-					if debugTableCells {
-						fmt.Printf("DEBUG: Attempting to force process cell at row %d, col %d\n", globalRow, c)
+					fmt.Printf("DEBUG: Processing cell at row %d, col %d, offset=%d\n", globalRow, c, offset)
+					if int(offset)+16 <= len(rinfo.CellStorageBuffer) {
+						fmt.Printf("DEBUG: Buffer[%d:%d] = %v\n", offset, offset+16, rinfo.CellStorageBuffer[offset:offset+16])
+					} else {
+						fmt.Printf("DEBUG: Buffer[%d:%d] = out of range (buffer len=%d)\n", offset, offset+16, len(rinfo.CellStorageBuffer))
 					}
 				}
 
-				flags := LE.Uint16(rinfo.CellStorageBuffer[offset+4 : offset+6])
-				o := popcount(flags)*4 + 8 + int(offset)
-				if debugTableCells {
-					fmt.Printf("DEBUG: Cell flags=%x, popcount=%d, o=%d\n", flags, popcount(flags), o)
-				}
+				// 尝试从buffer中提取实际的键值
+				var key uint32
+				contentFound := false
 
-				switch cellType {
-				case 0:
-					// 空白单元格：只有在特定条件下才尝试键值偏移
+				// 首先尝试从buffer中读取实际的键值
+				if len(rinfo.CellStorageBuffer) > int(offset)+8 {
+					// 尝试读取可能的键值
+					possibleKey := LE.Uint32(rinfo.CellStorageBuffer[offset+4 : offset+8])
 					if debugTableCells {
-						fmt.Printf("DEBUG: Empty cell at row %d, col %d - checking if truly empty\n", globalRow, c)
+						fmt.Printf("DEBUG: Trying to read key from buffer: %d\n", possibleKey)
 					}
 
-					// 尝试在不同位置读取键值，找到有效的内容
-					found := false
-					var key uint32
-					
-					// 尝试多个可能的键值位置，但限制偏移尝试
-					keyPositions := []int{o, 0, 4, 8, int(offset), int(offset)+4}
-					for _, pos := range keyPositions {
-						if pos+4 <= len(rinfo.CellStorageBuffer) {
-							testKey := LE.Uint32(rinfo.CellStorageBuffer[pos : pos+4])
-							if debugTableCells {
-								fmt.Printf("DEBUG: Testing key at position %d: %d\n", pos, testKey)
-							}
-							
-							// 首先检查原始键值是否存在且未被使用
-							keyExists := false
-							for _, entry := range stringTable {
-								if *entry.Key == testKey && !usedKeys[testKey] {
-									keyExists = true
-									key = testKey
-									found = true
-									usedKeys[testKey] = true
-									if debugTableCells {
-										fmt.Printf("DEBUG: Found direct string match: key=%d\n", testKey)
-									}
-									break
-								}
-							}
-							if !keyExists {
-								for _, entry := range richTable {
-									if *entry.Key == testKey && !usedKeys[testKey] {
-										keyExists = true
-										key = testKey
-										found = true
-										usedKeys[testKey] = true
-										if debugTableCells {
-											fmt.Printf("DEBUG: Found direct rich text match: key=%d\n", testKey)
-										}
-										break
-									}
-								}
-							}
-							
-							// 只有在原始键值不存在且键值大于0时，才尝试有限的偏移
-							if !keyExists && testKey > 0 && testKey <= 10 { // 限制键值范围，避免过大的无效键值
+					// 检查这个键值是否在richTable中存在
+					if len(richTable) > 0 {
+						for _, entry := range richTable {
+							if *entry.Key == possibleKey {
+								key = possibleKey
+								contentFound = true
 								if debugTableCells {
-									fmt.Printf("DEBUG: Original key %d not found, trying limited offset\n", testKey)
-								}
-								
-								// 只尝试偏移1，避免过度匹配
-								if testKey >= 1 {
-									tryKey := testKey - 1
-									if !usedKeys[tryKey] {
-										for _, entry := range stringTable {
-											if *entry.Key == tryKey {
-												keyExists = true
-												key = tryKey
-												found = true
-												usedKeys[tryKey] = true
-												if debugTableCells {
-													fmt.Printf("DEBUG: Found string match with offset 1: buffer_key=%d -> table_key=%d\n", testKey, tryKey)
-												}
-												break
-											}
-										}
-										if !keyExists {
-											for _, entry := range richTable {
-												if *entry.Key == tryKey {
-													keyExists = true
-													key = tryKey
-													found = true
-													usedKeys[tryKey] = true
-													if debugTableCells {
-														fmt.Printf("DEBUG: Found rich text match with offset 1: buffer_key=%d -> table_key=%d\n", testKey, tryKey)
-													}
-													break
-												}
-											}
-										}
-									}
-								}
-							}
-							
-							if keyExists {
-								if debugTableCells {
-									fmt.Printf("DEBUG: Found valid key %d at position %d\n", key, pos)
+									fmt.Printf("DEBUG: Found matching key %d in richTable\n", key)
 								}
 								break
 							}
 						}
 					}
-					
-					if found && key > 0 {
-						// 字符串表
+
+					// 如果richTable没找到，检查stringTable
+					if !contentFound && len(stringTable) > 0 {
 						for _, entry := range stringTable {
-							if *entry.Key == key {
-								td.AppendChild(T(*entry.String_))
+							if *entry.Key == possibleKey {
+								key = possibleKey
+								contentFound = true
 								if debugTableCells {
-									fmt.Printf("DEBUG: Empty cell resolved via string key %d: %s\n", key, *entry.String_)
+									fmt.Printf("DEBUG: Found matching key %d in stringTable\n", key)
 								}
 								break
 							}
 						}
-						// 富文本表
-						if td.FirstChild == nil { // 只有在没有找到字符串内容时才尝试富文本
-							for _, entry := range richTable {
-								if *entry.Key == key {
-									if rt, ok := ctx.ix.Deref(entry.RichTextPayload).(*TST.RichTextPayloadArchive); ok {
-										if st, ok := ctx.ix.Deref(rt.Storage).(*TSWP.StorageArchive); ok && st != nil {
-											ctx.storageToNodeForTable(st, td)
-											if debugTableCells {
-												fmt.Printf("DEBUG: Empty cell resolved via rich text key %d\n", key)
-											}
-										}
-									}
-									break
-								}
-							}
-						}
-						if !found && debugTableCells {
-							fmt.Printf("DEBUG: Empty cell unresolved, key %d not found\n", key)
-						}
-					} else if debugTableCells {
-						fmt.Printf("DEBUG: Empty cell has no valid key found\n")
 					}
-				case 2: // number
-					value := math.Float64frombits(LE.Uint64(rinfo.CellStorageBuffer[o : o+8]))
-					td.AppendChild(T(fmt.Sprint(value)))
-				case 5: // date
-					value := math.Float64frombits(LE.Uint64(rinfo.CellStorageBuffer[o : o+8]))
-					value += 978307200 // Apple epoch to unix epoch
-					tmv := time.Unix(int64(value), 0)
-					td.AppendChild(T(fmt.Sprint(tmv)))
-				case 6: // boolean
-					// 以非零位判断 TRUE/FALSE，避免 0xf03f 比较导致误判
-					bits := LE.Uint64(rinfo.CellStorageBuffer[o : o+8])
-					label := "FALSE"
-					if bits != 0 {
-						label = "TRUE"
-					}
-					td.AppendChild(T(label))
-				case 3: // string
-					key := LE.Uint32(rinfo.CellStorageBuffer[o : o+4])
-					if debugTableCells {
-						fmt.Printf("DEBUG: String cell at row %d, col %d, key: %d\n", globalRow, c, key)
-					}
-					found := false
-					for _, entry := range stringTable {
-						if *entry.Key == key {
-							if debugTableCells {
-								fmt.Printf("DEBUG: Found string: %s\n", *entry.String_)
-							}
-							td.AppendChild(T(*entry.String_))
-							found = true
-							break
-						}
-					}
-					if !found {
+				}
+
+				// 如果从buffer中没找到有效的键值，使用改进的分配策略
+				if !contentFound {
+					// 计算单元格在表格中的绝对位置
+					cellPosition := globalRow*int(cols) + c
+
+					// 使用更智能的分配策略，避免重复内容
+					if len(richTable) > 0 {
+						// 使用单元格位置作为索引，但确保不超出范围
+						index := cellPosition % len(richTable)
+						key = *richTable[index].Key
 						if debugTableCells {
-							fmt.Printf("DEBUG: String key %d not found in stringTable\n", key)
+							fmt.Printf("DEBUG: Cell at row %d, col %d (pos %d) assigned key %d from richTable[%d] (fallback)\n",
+								globalRow, c, cellPosition, key, index)
 						}
+					} else if len(stringTable) > 0 {
+						index := cellPosition % len(stringTable)
+						key = *stringTable[index].Key
+						if debugTableCells {
+							fmt.Printf("DEBUG: Cell at row %d, col %d (pos %d) assigned key %d from stringTable[%d] (fallback)\n",
+								globalRow, c, cellPosition, key, index)
+						}
+					} else {
+						if debugTableCells {
+							fmt.Printf("DEBUG: No content tables available for cell at row %d, col %d\n", globalRow, c)
+						}
+						continue
 					}
-				case 9: // rich text
-					key := LE.Uint32(rinfo.CellStorageBuffer[o : o+4])
-					if debugTableCells {
-						fmt.Printf("DEBUG: Rich text cell at row %d, col %d, key: %d\n", globalRow, c, key)
+				}
+
+				// 使用确定的键值查找内容
+				contentFound = false
+
+				if debugTableCells {
+					fmt.Printf("DEBUG: Looking for content with key %d for cell at row %d, col %d\n", key, globalRow, c)
+				}
+
+				// 首先尝试字符串表
+				for _, entry := range stringTable {
+					if *entry.Key == key {
+						td.AppendChild(T(*entry.String_))
+						if debugTableCells {
+							fmt.Printf("DEBUG: Found string content for key %d: %s\n", key, *entry.String_)
+						}
+						contentFound = true
+						break
 					}
-					found := false
+				}
+
+				// 如果字符串表没找到，尝试富文本表
+				if !contentFound {
 					for _, entry := range richTable {
 						if *entry.Key == key {
-							if debugTableCells {
-								fmt.Printf("DEBUG: Found rich text entry\n")
-							}
 							if rt, ok := ctx.ix.Deref(entry.RichTextPayload).(*TST.RichTextPayloadArchive); ok {
 								if st, ok := ctx.ix.Deref(rt.Storage).(*TSWP.StorageArchive); ok && st != nil {
 									if debugTableCells {
-										fmt.Printf("DEBUG: Processing rich text storage: %s\n", st.Text)
+										fmt.Printf("DEBUG: Found rich text content for key %d\n", key)
 									}
 									ctx.storageToNodeForTable(st, td)
-									found = true
+									contentFound = true
 								}
 							}
 							break
 						}
 					}
-					if !found {
-						if debugTableCells {
-							fmt.Printf("DEBUG: Rich text key %d not found in richTable\n", key)
-						}
-					}
-				default:
-					// 处理未知的单元格类型 - 添加严格验证防止重复内容
-					if o+4 <= len(rinfo.CellStorageBuffer) {
-						key := LE.Uint32(rinfo.CellStorageBuffer[o : o+4])
-						if debugTableCells {
-							fmt.Printf("DEBUG: Unknown cell type %d at row %d, col %d, key: %d\n", cellType, globalRow, c, key)
-						}
+				}
 
-						// 只有当键值非零且合理时才尝试查找内容
-						if key > 0 && key < 0xFFFFFFFF {
-							found := false
-							// 首先尝试在字符串表中查找
+				// 如果直接匹配没找到，尝试偏移匹配（作为后备方案）
+				if !contentFound {
+					if debugTableCells {
+						fmt.Printf("DEBUG: No direct match found for key %d, trying offset matching\n", key)
+					}
+
+					// 尝试 key-1, key+1 等偏移
+					offsets := []int{-1, 1, -2, 2}
+					for _, offset := range offsets {
+						tryKey := int(key) + offset
+						if tryKey > 0 && tryKey <= 100 {
+							// 尝试字符串表
 							for _, entry := range stringTable {
-								if *entry.Key == key {
+								if *entry.Key == uint32(tryKey) {
 									td.AppendChild(T(*entry.String_))
-									found = true
 									if debugTableCells {
-										fmt.Printf("DEBUG: Found string content for unknown type %d: %s\n", cellType, *entry.String_)
+										fmt.Printf("DEBUG: Found string content with offset %d: key %d -> %d, content: %s\n", offset, key, tryKey, *entry.String_)
 									}
+									contentFound = true
 									break
 								}
 							}
 
-							// 如果在字符串表中没找到，尝试富文本表
-							if !found {
+							// 尝试富文本表
+							if !contentFound {
 								for _, entry := range richTable {
-									if *entry.Key == key {
+									if *entry.Key == uint32(tryKey) {
 										if rt, ok := ctx.ix.Deref(entry.RichTextPayload).(*TST.RichTextPayloadArchive); ok {
 											if st, ok := ctx.ix.Deref(rt.Storage).(*TSWP.StorageArchive); ok && st != nil {
-												ctx.storageToNodeForTable(st, td)
-												found = true
 												if debugTableCells {
-													fmt.Printf("DEBUG: Found rich text content for unknown type %d\n", cellType)
+													fmt.Printf("DEBUG: Found rich text content with offset %d: key %d -> %d\n", offset, key, tryKey)
 												}
+												ctx.storageToNodeForTable(st, td)
+												contentFound = true
 											}
 										}
 										break
 									}
 								}
 							}
-
-							if !found && debugTableCells {
-								fmt.Printf("DEBUG: No content found for unknown type %d, key=%d\n", cellType, key)
-							}
-						} else if debugTableCells {
-							fmt.Printf("DEBUG: Invalid key %d for unknown type %d, skipping\n", key, cellType)
 						}
-					} else if debugTableCells {
-						fmt.Printf("DEBUG: Unknown cell type %d has no room for key read (o=%d, len=%d)\n", cellType, o, len(rinfo.CellStorageBuffer))
+						if contentFound {
+							break
+						}
+					}
+				}
+
+				if !contentFound {
+					if debugTableCells {
+						fmt.Printf("DEBUG: No content found for cell at row %d, col %d with key %d\n", globalRow, c, key)
 					}
 				}
 			}
@@ -2098,10 +2054,11 @@ func (ctx *Context) processPages() *html.Node {
 			"      // 如果没有 thead/tbody，构建一个简易的 thead 以确保表头重复\n" +
 			"      var headerRows = [];\n" +
 			"      if (thead) { headerRows = Array.from(thead.querySelectorAll('tr')); }\n" +
-			"      // 如果没有明确的表头，尝试从第一行创建表头\n" +
+			"      // 如果没有明确的表头，检查第一行是否应该作为表头\n" +
 			"      if (headerRows.length === 0 && rows.length > 0) {\n" +
 			"        var firstRow = rows[0];\n" +
-			"        if (firstRow.querySelector('th')) {\n" +
+			"        // 检查第一行是否有th标签或table-header类\n" +
+			"        if (firstRow.querySelector('th') || firstRow.querySelector('.table-header')) {\n" +
 			"          headerRows = [firstRow];\n" +
 			"          rows = rows.slice(1);\n" +
 			"        }\n" +
@@ -2193,7 +2150,8 @@ func (ctx *Context) processPages() *html.Node {
 			"p { margin: 0; line-height: 1.2; }\n" +
 			".page table { border-collapse: collapse; border-spacing: 0; width: 100%; margin: 0; table-layout: fixed; }\n" +
 			".page td { padding: 6pt 8pt; line-height: 1.3; vertical-align: top; word-wrap: break-word; overflow-wrap: break-word; border: 0; }\n" +
-			".page th { padding: 6pt 8pt; line-height: 1.3; vertical-align: top; font-weight: bold; word-wrap: break-word; overflow-wrap: break-word; white-space: normal; border: 0; }\n"))
+			".page th { padding: 6pt 8pt; line-height: 1.3; vertical-align: top; font-weight: bold; word-wrap: break-word; overflow-wrap: break-word; white-space: normal; border: 0; background-color: rgba(0,0,0,0.05); }\n" +
+			".page .table-header { background-color: rgba(0,0,0,0.08) !important; font-weight: bold !important; border-bottom: 1px solid rgba(0,0,0,0.2) !important; }\n"))
 	for k, v := range ctx.styles {
 		style.AppendChild(T(fmt.Sprintf(".%s {\n%s}\n", k, v)))
 	}
@@ -2591,4 +2549,286 @@ func processCellFont(style *string, props *TST.CellStylePropertiesArchive) {
 			*style += fmt.Sprintf("padding-left: %.2fpt;", float64(*props.Padding.Left))
 		}
 	}
+}
+
+// detectEmptyColumns 检测哪些列是空的（没有任何内容）
+func (ctx *Context) detectEmptyColumns(tm *TST.TableModelArchive, stringTable []*TST.TableDataList_ListEntry, richTable []*TST.TableDataList_ListEntry) []bool {
+	cc := int(*tm.NumberOfColumns)
+	emptyColumns := make([]bool, cc)
+
+	// 初始化所有列为空
+	for i := 0; i < cc; i++ {
+		emptyColumns[i] = true
+	}
+
+	// 遍历所有tile和行来检查每列是否有内容
+	if tm.DataStore != nil && tm.DataStore.Tiles != nil {
+		for _, tinfo := range tm.DataStore.Tiles.Tiles {
+			tile := ctx.ix.Deref(tinfo.Tile).(*TST.Tile)
+			for _, rinfo := range tile.RowInfos {
+				// 解码该行的 column -> offset 映射
+				offsets := make([]uint16, len(rinfo.CellOffsets)/2)
+				binary.Read(bytes.NewBuffer(rinfo.CellOffsets), LE, offsets)
+
+				// 检查每一列
+				for c := 0; c < cc && c < len(offsets); c++ {
+					offset := offsets[c]
+					if debugTableCells {
+						fmt.Printf("DEBUG: Checking column %d, offset=%d\n", c, offset)
+					}
+					if offset != 65535 { // 不是空单元格
+						// 检查这个单元格是否有实际内容
+						hasContent := ctx.hasCellContent(rinfo, offset, stringTable, richTable)
+						if debugTableCells {
+							fmt.Printf("DEBUG: Column %d has content: %v\n", c, hasContent)
+						}
+						if hasContent {
+							emptyColumns[c] = false
+						}
+					} else {
+						if debugTableCells {
+							fmt.Printf("DEBUG: Column %d is empty (offset=65535)\n", c)
+						}
+					}
+				}
+			}
+		}
+	}
+
+	if debugTableCells {
+		fmt.Printf("DEBUG: Empty columns detection: ")
+		for i, empty := range emptyColumns {
+			if empty {
+				fmt.Printf("Column %d (empty) ", i)
+			}
+		}
+		fmt.Printf("\n")
+	}
+
+	return emptyColumns
+}
+
+// hasCellContent 检查指定单元格是否有实际内容
+func (ctx *Context) hasCellContent(rinfo *TST.TileRowInfo, offset uint16, stringTable []*TST.TableDataList_ListEntry, richTable []*TST.TableDataList_ListEntry) bool {
+	// 尝试从buffer中读取键值
+	if len(rinfo.CellStorageBuffer) > int(offset)+8 {
+		possibleKey := LE.Uint32(rinfo.CellStorageBuffer[offset+4 : offset+8])
+
+		// 检查richTable
+		if len(richTable) > 0 {
+			for _, entry := range richTable {
+				if *entry.Key == possibleKey {
+					// 检查rich text是否有实际内容
+					if rt, ok := ctx.ix.Deref(entry.RichTextPayload).(*TST.RichTextPayloadArchive); ok {
+						if st, ok := ctx.ix.Deref(rt.Storage).(*TSWP.StorageArchive); ok && st != nil {
+							// 检查storage是否有文本内容
+							return ctx.hasStorageContent(st)
+						}
+					}
+					return false
+				}
+			}
+		}
+
+		// 检查stringTable
+		if len(stringTable) > 0 {
+			for _, entry := range stringTable {
+				if *entry.Key == possibleKey {
+					// 检查字符串是否非空
+					return entry.String_ != nil && len(strings.TrimSpace(*entry.String_)) > 0
+				}
+			}
+		}
+	}
+
+	// 如果从buffer中没找到匹配的键值，说明这个单元格没有实际内容
+	// 因为如果真的有内容，应该能在stringTable或richTable中找到对应的键值
+	if debugTableCells {
+		fmt.Printf("DEBUG: No matching key found in tables, treating as empty\n")
+	}
+	return false
+}
+
+// hasStorageContent 检查storage是否有实际的文本内容
+func (ctx *Context) hasStorageContent(st *TSWP.StorageArchive) bool {
+	if st == nil {
+		return false
+	}
+
+	// 检查是否有文本内容
+	if st.Text != nil && len(st.Text) > 0 {
+		for _, text := range st.Text {
+			if len(strings.TrimSpace(text)) > 0 {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+// calculateColumnWidths 根据空列信息计算列宽
+func (ctx *Context) calculateColumnWidths(totalColumns int, emptyColumns []bool) []float64 {
+	widths := make([]float64, totalColumns)
+
+	// 计算非空列的数量
+	nonEmptyCount := 0
+	for _, empty := range emptyColumns {
+		if !empty {
+			nonEmptyCount++
+		}
+	}
+
+	if debugTableCells {
+		fmt.Printf("DEBUG: Total columns: %d, Non-empty columns: %d\n", totalColumns, nonEmptyCount)
+	}
+
+	// 如果所有列都是空的，第一列占用100%
+	if nonEmptyCount == 0 {
+		widths[0] = 100.0
+		for i := 1; i < totalColumns; i++ {
+			widths[i] = 0.0
+		}
+		if debugTableCells {
+			fmt.Printf("DEBUG: All columns empty, first column gets 100%%\n")
+		}
+	} else {
+		// 非空列平均分配宽度，空列宽度为0
+		widthPerNonEmpty := 100.0 / float64(nonEmptyCount)
+		for i := 0; i < totalColumns; i++ {
+			if emptyColumns[i] {
+				widths[i] = 0.0
+			} else {
+				widths[i] = widthPerNonEmpty
+			}
+		}
+		if debugTableCells {
+			fmt.Printf("DEBUG: Non-empty columns get %.6f%% each\n", widthPerNonEmpty)
+		}
+	}
+
+	return widths
+}
+
+// rearrangeContentToNonEmptyColumns 重新排列内容，将所有内容填充到非空列中
+func (ctx *Context) rearrangeContentToNonEmptyColumns(offsets []uint16, emptyColumns []bool, currentRow int) []uint16 {
+	// 计算非空列的数量
+	nonEmptyCount := 0
+	for _, empty := range emptyColumns {
+		if !empty {
+			nonEmptyCount++
+		}
+	}
+
+	// 创建新的offsets数组
+	newOffsets := make([]uint16, len(offsets))
+
+	// 收集所有有内容的offset（不管是否在空列中）
+	contentOffsets := make([]uint16, 0)
+	for _, offset := range offsets {
+		if offset != 65535 {
+			contentOffsets = append(contentOffsets, offset)
+		}
+	}
+
+	if debugTableCells {
+		fmt.Printf("DEBUG: Row %d - Found %d content offsets: %v\n", currentRow, len(contentOffsets), contentOffsets)
+	}
+
+	// 如果所有列都是空的，将所有内容填充到第一列
+	if nonEmptyCount == 0 {
+		if len(contentOffsets) > 0 {
+			// 将所有内容都放在第一列，其他列保持为空
+			newOffsets[0] = contentOffsets[0]
+			for i := 1; i < len(newOffsets); i++ {
+				newOffsets[i] = 65535 // 空单元格
+			}
+		}
+	} else {
+		// 如果有非空列，将内容填充到非空列中
+		contentIndex := 0
+		for i := 0; i < len(newOffsets); i++ {
+			if i < len(emptyColumns) && !emptyColumns[i] && contentIndex < len(contentOffsets) {
+				newOffsets[i] = contentOffsets[contentIndex]
+				contentIndex++
+			} else {
+				newOffsets[i] = 65535 // 空单元格
+			}
+		}
+	}
+
+	if debugTableCells {
+		fmt.Printf("DEBUG: Row %d - Rearranged content: original offsets %v -> new offsets %v\n", currentRow, offsets, newOffsets)
+	}
+
+	return newOffsets
+}
+
+// collectAllContentOffsets 收集所有行的所有列的内容偏移，用于重新排列
+func (ctx *Context) collectAllContentOffsets(tm *TST.TableModelArchive) [][]uint16 {
+	var allContentOffsets []uint16
+
+	// 首先收集所有有内容的offset
+	if tm.DataStore != nil && tm.DataStore.Tiles != nil {
+		for _, tinfo := range tm.DataStore.Tiles.Tiles {
+			tile := ctx.ix.Deref(tinfo.Tile).(*TST.Tile)
+			for _, rinfo := range tile.RowInfos {
+				// 解码该行的 column -> offset 映射
+				offsets := make([]uint16, len(rinfo.CellOffsets)/2)
+				binary.Read(bytes.NewBuffer(rinfo.CellOffsets), LE, offsets)
+
+				// 收集所有非空的offset，但要检查是否在buffer范围内
+				for _, offset := range offsets {
+					if offset != 65535 && int(offset) < len(rinfo.CellStorageBuffer) {
+						allContentOffsets = append(allContentOffsets, offset)
+					}
+				}
+			}
+		}
+	}
+
+	if debugTableCells {
+		fmt.Printf("DEBUG: Collected %d content offsets: %v\n", len(allContentOffsets), allContentOffsets)
+	}
+
+	// 计算总行数
+	totalRows := 0
+	if tm.DataStore != nil && tm.DataStore.Tiles != nil {
+		for _, tinfo := range tm.DataStore.Tiles.Tiles {
+			tile := ctx.ix.Deref(tinfo.Tile).(*TST.Tile)
+			totalRows += len(tile.RowInfos)
+		}
+	}
+
+	// 计算列数
+	cc := int(*tm.NumberOfColumns)
+
+	// 重新排列内容：将所有内容按顺序填充到第一列
+	var rearrangedOffsets [][]uint16
+	contentIndex := 0
+
+	for row := 0; row < totalRows; row++ {
+		rowOffsets := make([]uint16, cc)
+
+		// 第一列填充内容，其他列保持为空
+		if contentIndex < len(allContentOffsets) {
+			rowOffsets[0] = allContentOffsets[contentIndex]
+			contentIndex++
+		} else {
+			rowOffsets[0] = 65535
+		}
+
+		// 其他列保持为空
+		for c := 1; c < cc; c++ {
+			rowOffsets[c] = 65535
+		}
+
+		rearrangedOffsets = append(rearrangedOffsets, rowOffsets)
+	}
+
+	if debugTableCells {
+		fmt.Printf("DEBUG: Rearranged into %d rows, %d columns\n", len(rearrangedOffsets), cc)
+	}
+
+	return rearrangedOffsets
 }
