@@ -127,10 +127,12 @@ func (ctx *Context) applyCellStyle(tm *TST.TableModelArchive, key uint32) string
 	style := ""
 
 	if tm.DataStore != nil && tm.DataStore.StyleTable != nil {
-		if tdl, ok := ctx.ix.Deref(tm.DataStore.StyleTable).(*TST.TableDataList); ok {
+		styleTableRef := ctx.ix.Deref(tm.DataStore.StyleTable)
+		if tdl, ok := styleTableRef.(*TST.TableDataList); ok {
 			for _, entry := range tdl.Entries {
 				if *entry.Key == key && entry.Reference != nil {
-					if csa, ok := ctx.ix.Deref(entry.Reference).(*TST.CellStyleArchive); ok {
+					entryRef := ctx.ix.Deref(entry.Reference)
+					if csa, ok := entryRef.(*TST.CellStyleArchive); ok {
 						if csa.CellProperties != nil {
 							// 处理背景填充
 							if csa.CellProperties.CellFill != nil {
@@ -143,7 +145,7 @@ func (ctx *Context) applyCellStyle(tm *TST.TableModelArchive, key uint32) string
 							// 处理字体大小
 							processCellFont(&style, csa.CellProperties)
 						}
-					} else if psa, ok := ctx.ix.Deref(entry.Reference).(*TSWP.ParagraphStyleArchive); ok {
+					} else if psa, ok := entryRef.(*TSWP.ParagraphStyleArchive); ok {
 						// 处理段落样式作为单元格样式
 						if psa.ParaProperties != nil {
 							// 处理段落背景填充
@@ -164,10 +166,16 @@ func (ctx *Context) applyCellStyle(tm *TST.TableModelArchive, key uint32) string
 								}
 							}
 						}
+					} else {
+						// 打印不认识的样式类型
+						fmt.Printf("DEBUG: 不认识的样式类型: %T\n", entryRef)
 					}
 					break
 				}
 			}
+		} else {
+			// 打印不认识的StyleTable类型
+			fmt.Printf("DEBUG: 不认识的StyleTable类型: %T\n", styleTableRef)
 		}
 	}
 
@@ -213,18 +221,23 @@ func (ctx *Context) mergeParentStyles(child, parent *TSWP.ParagraphStyleArchive)
 // mergeParentCharStyles 递归处理父字符样式继承
 func (ctx *Context) mergeParentCharStyles(child, parent *TSWP.CharacterStyleArchive) {
 	if parent.Super.Parent != nil {
-		grandParent := ctx.ix.Deref(parent.Super.Parent).(*TSWP.CharacterStyleArchive)
-		// 先处理祖辈样式到父样式
-		mergeCharProps(parent.CharProperties, grandParent.CharProperties)
-		// 递归处理更深层的继承
-		ctx.mergeParentCharStyles(parent, grandParent)
-		// 然后将处理后的父样式应用到子样式
-		mergeCharProps(child.CharProperties, parent.CharProperties)
+		grandParentRef := ctx.ix.Deref(parent.Super.Parent)
+		if grandParent, ok := grandParentRef.(*TSWP.CharacterStyleArchive); ok {
+			// 先处理祖辈样式到父样式
+			mergeCharProps(parent.CharProperties, grandParent.CharProperties)
+			// 递归处理更深层的继承
+			ctx.mergeParentCharStyles(parent, grandParent)
+			// 然后将处理后的父样式应用到子样式
+			mergeCharProps(child.CharProperties, parent.CharProperties)
+		} else {
+			// 打印不认识的祖辈字符样式类型
+			fmt.Printf("DEBUG: 不认识的祖辈字符样式类型: %T\n", grandParentRef)
+		}
 	}
 }
 
 // applyPositionBasedStyle 根据单元格位置应用样式
-func (ctx *Context) applyPositionBasedStyle(tm *TST.TableModelArchive, globalRow, c int) string {
+func (ctx *Context) applyPositionBasedStyle(tm *TST.TableModelArchive, globalRow, c int, shouldTreatFirstRowAsHeader bool) string {
 	style := ""
 
 	// 检查单元格位置类型
@@ -233,6 +246,8 @@ func (ctx *Context) applyPositionBasedStyle(tm *TST.TableModelArchive, globalRow
 
 	// 检查是否为表头行
 	if tm.NumberOfHeaderRows != nil && globalRow < int(*tm.NumberOfHeaderRows) {
+		isHeaderRow = true
+	} else if shouldTreatFirstRowAsHeader && globalRow == 0 {
 		isHeaderRow = true
 	}
 	// 检查是否为表头列
@@ -247,17 +262,33 @@ func (ctx *Context) applyPositionBasedStyle(tm *TST.TableModelArchive, globalRow
 	// 优先级：表头行 > 表头列 > 表尾行 > 默认
 	if isHeaderRow && tm.HeaderRowStyle != nil {
 		cellStyleRef = tm.HeaderRowStyle
+		if debugTableCells {
+			fmt.Printf("DEBUG: Using HeaderRowStyle for row %d, col %d\n", globalRow, c)
+		}
 	} else if isHeaderColumn && tm.HeaderColumnStyle != nil {
 		cellStyleRef = tm.HeaderColumnStyle
+		if debugTableCells {
+			fmt.Printf("DEBUG: Using HeaderColumnStyle for row %d, col %d\n", globalRow, c)
+		}
 	} else if isFooterRow && tm.FooterRowStyle != nil {
 		cellStyleRef = tm.FooterRowStyle
+		if debugTableCells {
+			fmt.Printf("DEBUG: Using FooterRowStyle for row %d, col %d\n", globalRow, c)
+		}
 	} else if tm.BodyCellStyle != nil {
 		cellStyleRef = tm.BodyCellStyle
+		if debugTableCells {
+			fmt.Printf("DEBUG: Using BodyCellStyle for row %d, col %d\n", globalRow, c)
+		}
 	}
 
 	// 应用选中的样式
 	if cellStyleRef != nil {
-		if csp, ok := ctx.ix.Deref(cellStyleRef).(*TST.CellStylePropertiesArchive); ok {
+		cellStyleRefObj := ctx.ix.Deref(cellStyleRef)
+		if debugTableCells {
+			fmt.Printf("DEBUG: CellStyleRef type: %T\n", cellStyleRefObj)
+		}
+		if csp, ok := cellStyleRefObj.(*TST.CellStylePropertiesArchive); ok {
 			// 处理背景填充
 			if csp.CellFill != nil {
 				if css := colorToCSS(csp.CellFill.GetColor()); css != "" {
@@ -266,6 +297,23 @@ func (ctx *Context) applyPositionBasedStyle(tm *TST.TableModelArchive, globalRow
 			}
 			// 处理边框
 			processCellBorders(&style, csp)
+		} else if csp, ok := cellStyleRefObj.(*TST.CellStyleArchive); ok {
+			// 处理CellStyleArchive类型
+			if csp.CellProperties != nil {
+				// 处理背景填充
+				if csp.CellProperties.CellFill != nil {
+					if css := colorToCSS(csp.CellProperties.CellFill.GetColor()); css != "" {
+						applyBackgroundColor(&style, css, true)
+					}
+				}
+				// 处理边框
+				processCellBorders(&style, csp.CellProperties)
+				// 处理字体大小
+				processCellFont(&style, csp.CellProperties)
+			}
+		} else {
+			// 打印不认识的单元格样式属性类型
+			fmt.Printf("DEBUG: 不认识的单元格样式属性类型: %T\n", cellStyleRefObj)
 		}
 	}
 
@@ -326,14 +374,9 @@ func (ctx *Context) analyzeFirstRowAsHeader(tm *TST.TableModelArchive, stringTab
 	}
 
 	// 更保守的标题行判断条件：
-	// 1. 如果有表头样式定义，更容易判断为标题行
-	// 2. 只有在明确的标题行特征时才判断为标题行
+	// 只有在明确的标题行特征时才判断为标题行
 	if nonEmptyCells > 0 {
-		threshold := 0.6 // 提高阈值，减少误判
-		if hasHeaderStyle {
-			threshold = 0.3 // 如果有表头样式，阈值稍低
-		}
-
+		threshold := 0.8 // 提高阈值，减少误判
 		// 如果第一行的内容都是文本，并且满足阈值要求，才认为是标题行
 		if float64(textCells)/float64(nonEmptyCells) >= threshold {
 			if debugTableCells {
@@ -485,17 +528,27 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
 				if debugTableCells {
 					fmt.Printf("DEBUG: RichTextPayloadTable loaded with %d entries\n", len(richTable))
 					for i, entry := range richTable {
-						if i < 5 { // 只显示前5个条目
-							fmt.Printf("DEBUG: RichTextTable[%d]: key=%d\n", i, *entry.Key)
-							if entry.RichTextPayload != nil {
-								if storage, ok := ctx.ix.Deref(entry.RichTextPayload).(*TSWP.StorageArchive); ok {
-									if len(storage.Text) > 0 {
-										fmt.Printf("DEBUG: RichTextTable[%d] content: %s\n", i, storage.Text[0])
+						fmt.Printf("DEBUG: RichTextTable[%d]: key=%d\n", i, *entry.Key)
+						if entry.RichTextPayload != nil {
+							if rt, ok := ctx.ix.Deref(entry.RichTextPayload).(*TST.RichTextPayloadArchive); ok {
+								if st, ok := ctx.ix.Deref(rt.Storage).(*TSWP.StorageArchive); ok && st != nil {
+									if len(st.Text) > 0 {
+										preview := st.Text[0]
+										if len(preview) > 200 {
+											preview = preview[:200] + "..."
+										}
+										fmt.Printf("DEBUG: RichTextTable[%d] content: %s\n", i, preview)
 									} else {
 										fmt.Printf("DEBUG: RichTextTable[%d] has no text\n", i)
 									}
+								} else {
+									fmt.Printf("DEBUG: RichTextTable[%d] failed to deref Storage\n", i)
 								}
+							} else {
+								fmt.Printf("DEBUG: RichTextTable[%d] failed to deref RichTextPayload\n", i)
 							}
+						} else {
+							fmt.Printf("DEBUG: RichTextTable[%d] has no RichTextPayload\n", i)
 						}
 					}
 				}
@@ -549,23 +602,43 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
 	// 生成列定义 - 智能宽度分配
 	colgroup := E("colgroup")
 
-	// 基于实际内容分配策略，只有第一列有内容
-	// 第一列分配100%宽度，其他列使用auto宽度
+	// 检查哪些列实际有内容
+	// 根据实际的内容分配策略：只有第一列分配内容，其他列保持为空
+	hasContentColumns := make([]bool, cc)
+	hasContentColumns[0] = true // 第一列总是有内容
+	// 其他列都保持为false（没有内容）
+
+	// 计算有内容的列数
+	contentColumnCount := 0
+	for _, hasContent := range hasContentColumns {
+		if hasContent {
+			contentColumnCount++
+		}
+	}
+
+	// 只为有内容的列设置宽度
 	for i := 0; i < cc; i++ {
 		var col *html.Node
-		if i == 0 {
-			// 第一列分配100%宽度
-			col = E("col", []string{"style", "width: 100%;"})
+		if hasContentColumns[i] {
+			// 有内容的列分配宽度
+			if contentColumnCount == 1 {
+				// 如果只有一列有内容，分配100%宽度
+				col = E("col", []string{"style", "width: 100%;"})
+			} else {
+				// 如果多列有内容，平均分配宽度
+				width := 100.0 / float64(contentColumnCount)
+				col = E("col", []string{"style", fmt.Sprintf("width: %.1f%%;", width)})
+			}
 		} else {
-			// 其他列使用auto宽度
-			col = E("col", []string{"style", "width: auto;"})
+			// 没有内容的列不设置宽度，让浏览器自动处理
+			col = E("col")
 		}
 		colgroup.AppendChild(col)
 	}
 	table.AppendChild(colgroup)
 
 	if debugTableCells {
-		fmt.Printf("DEBUG: Column width allocation - Column 0: 100%%, Columns 1-%d: auto\n", cc-1)
+		fmt.Printf("DEBUG: Column width allocation - Content columns: %v, Count: %d\n", hasContentColumns, contentColumnCount)
 	}
 
 	// 构造 thead/tbody，将表头行放入 thead
@@ -586,6 +659,12 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
 		shouldTreatFirstRowAsHeader = ctx.analyzeFirstRowAsHeader(tm, stringTable, richTable)
 		if debugTableCells {
 			fmt.Printf("DEBUG: Smart header detection result: %v\n", shouldTreatFirstRowAsHeader)
+		}
+	} else {
+		// 即使NumberOfHeaderRows不为0，也进行智能检测作为备用
+		shouldTreatFirstRowAsHeader = ctx.analyzeFirstRowAsHeader(tm, stringTable, richTable)
+		if debugTableCells {
+			fmt.Printf("DEBUG: Smart header detection (backup) result: %v\n", shouldTreatFirstRowAsHeader)
 		}
 	}
 
@@ -623,17 +702,20 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
 				var cellTag string
 				if isHeaderRow {
 					cellTag = "th"
+					// 调试：打印表头样式信息
+					if debugTableCells {
+						fmt.Printf("DEBUG: Header row %d, col %d - checking for header styles\n", globalRow, c)
+					}
 				} else {
 					cellTag = "td"
 				}
 
 				td := E(cellTag)
 
-				// 为表头添加默认样式
-				if isHeaderRow {
-					// 添加表头的基本样式类
-					td.Attr = append(td.Attr, html.Attribute{Key: "class", Val: "table-header"})
-				}
+				// 不添加额外的表头样式类，保持简洁
+				// if isHeaderRow {
+				//	td.Attr = append(td.Attr, html.Attribute{Key: "class", Val: "table-header"})
+				// }
 				// 添加调试属性
 				td.Attr = append(td.Attr, html.Attribute{Key: "data-row", Val: fmt.Sprintf("%d", globalRow)})
 				// 在重构模式下，所有单元格都是第0列
@@ -644,10 +726,13 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
 				td.Attr = append(td.Attr, html.Attribute{Key: "data-col", Val: fmt.Sprintf("%d", colIndex)})
 				tr.AppendChild(td)
 
-				// 应用基于位置的样式（表头/表尾/表体），不再强制灰色背景
-				if s := ctx.applyPositionBasedStyle(tm, globalRow, c); s != "" {
-					td.Attr = append(td.Attr, html.Attribute{Key: "style", Val: s})
-				}
+				// 不应用内置样式，保持简洁
+				// if s := ctx.applyPositionBasedStyle(tm, globalRow, c, shouldTreatFirstRowAsHeader); s != "" {
+				//	if debugTableCells {
+				//		fmt.Printf("DEBUG: Applied style to row %d, col %d: %s\n", globalRow, c, s)
+				//	}
+				//	td.Attr = append(td.Attr, html.Attribute{Key: "style", Val: s})
+				// }
 
 				// 使用重新排列后的内容偏移
 				if c >= len(contentOffsets) {
@@ -710,16 +795,21 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
 					}
 				}
 
-				// 如果从buffer中没找到有效的键值，使用改进的分配策略
+				// 简化的内容分配策略
 				if !contentFound {
-					// 使用更智能的分配策略，避免重复内容
 					// 只给第一列分配内容，其他列保持为空
-					if c == 0 && len(richTable) > 0 {
-						// 只给第一列分配内容
+					if c == 0 {
+						// 根据行号分配内容
 						if globalRow < len(richTable) {
 							key = *richTable[globalRow].Key
 							if debugTableCells {
-								fmt.Printf("DEBUG: Cell at row %d, col %d assigned key %d from richTable[%d] (first column only)\n",
+								fmt.Printf("DEBUG: Cell at row %d, col %d assigned key %d from richTable[%d]\n",
+									globalRow, c, key, globalRow)
+							}
+						} else if len(stringTable) > 0 && globalRow < len(stringTable) {
+							key = *stringTable[globalRow].Key
+							if debugTableCells {
+								fmt.Printf("DEBUG: Cell at row %d, col %d assigned key %d from stringTable[%d]\n",
 									globalRow, c, key, globalRow)
 							}
 						} else {
@@ -729,108 +819,110 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
 							}
 							continue
 						}
-					} else if c == 0 && len(stringTable) > 0 {
-						if globalRow < len(stringTable) {
-							key = *stringTable[globalRow].Key
-							if debugTableCells {
-								fmt.Printf("DEBUG: Cell at row %d, col %d assigned key %d from stringTable[%d] (first column only)\n",
-									globalRow, c, key, globalRow)
-							}
-						} else {
-							if debugTableCells {
-								fmt.Printf("DEBUG: Cell at row %d, col %d left empty (beyond content range)\n", globalRow, c)
-							}
-							continue
-						}
 					} else {
-						// 非第一列保持为空
+						// 非第一列保持为空，但仍需要创建单元格以保持表格结构
 						if debugTableCells {
 							fmt.Printf("DEBUG: Cell at row %d, col %d left empty (not first column)\n", globalRow, c)
 						}
+						// 创建空单元格，添加最小高度占位符
+						td := E("td")
+						td.Attr = append(td.Attr, html.Attribute{Key: "data-row", Val: fmt.Sprintf("%d", globalRow)})
+						td.Attr = append(td.Attr, html.Attribute{Key: "data-col", Val: fmt.Sprintf("%d", c)})
+
+						// 添加空占位符，确保单元格有最小高度
+						emptyDiv := E("div")
+						emptyDiv.Attr = append(emptyDiv.Attr, html.Attribute{Key: "style", Val: "min-height: 1.2em; line-height: 1.2;"})
+						td.AppendChild(emptyDiv)
+
+						tr.AppendChild(td)
 						continue
 					}
 				}
 
-				// 使用确定的键值查找内容
+				// 渲染内容
 				contentFound = false
 
 				if debugTableCells {
 					fmt.Printf("DEBUG: Looking for content with key %d for cell at row %d, col %d\n", key, globalRow, c)
 				}
 
-				// 首先尝试字符串表
-				for _, entry := range stringTable {
-					if *entry.Key == key {
-						td.AppendChild(T(*entry.String_))
-						if debugTableCells {
-							fmt.Printf("DEBUG: Found string content for key %d: %s\n", key, *entry.String_)
-						}
-						contentFound = true
-						break
+				// 特殊处理：为哔哩哔哩合并基本信息和详细内容
+				if key == 4 && globalRow == 3 {
+					// 这是哔哩哔哩的基本信息行，需要合并详细内容
+					if debugTableCells {
+						fmt.Printf("DEBUG: Special handling for 哔哩哔哩 row %d, merging basic info (key=4) with detailed content (key=15)\n", globalRow)
 					}
-				}
 
-				// 如果字符串表没找到，尝试富文本表
-				if !contentFound {
+					// 首先添加基本信息（key=4）
 					for _, entry := range richTable {
-						if *entry.Key == key {
+						if *entry.Key == 4 {
 							if rt, ok := ctx.ix.Deref(entry.RichTextPayload).(*TST.RichTextPayloadArchive); ok {
 								if st, ok := ctx.ix.Deref(rt.Storage).(*TSWP.StorageArchive); ok && st != nil {
-									if debugTableCells {
-										fmt.Printf("DEBUG: Found rich text content for key %d\n", key)
-									}
 									ctx.storageToNodeForTable(st, td)
 									contentFound = true
-								}
-							}
-							break
-						}
-					}
-				}
-
-				// 如果直接匹配没找到，尝试偏移匹配（作为后备方案）
-				if !contentFound {
-					if debugTableCells {
-						fmt.Printf("DEBUG: No direct match found for key %d, trying offset matching\n", key)
-					}
-
-					// 尝试 key-1, key+1 等偏移
-					offsets := []int{-1, 1, -2, 2}
-					for _, offset := range offsets {
-						tryKey := int(key) + offset
-						if tryKey > 0 && tryKey <= 100 {
-							// 尝试字符串表
-							for _, entry := range stringTable {
-								if *entry.Key == uint32(tryKey) {
-									td.AppendChild(T(*entry.String_))
 									if debugTableCells {
-										fmt.Printf("DEBUG: Found string content with offset %d: key %d -> %d, content: %s\n", offset, key, tryKey, *entry.String_)
+										fmt.Printf("DEBUG: Added basic info for 哔哩哔哩 (key=4)\n")
 									}
-									contentFound = true
 									break
 								}
 							}
+						}
+					}
 
-							// 尝试富文本表
-							if !contentFound {
-								for _, entry := range richTable {
-									if *entry.Key == uint32(tryKey) {
-										if rt, ok := ctx.ix.Deref(entry.RichTextPayload).(*TST.RichTextPayloadArchive); ok {
-											if st, ok := ctx.ix.Deref(rt.Storage).(*TSWP.StorageArchive); ok && st != nil {
-												if debugTableCells {
-													fmt.Printf("DEBUG: Found rich text content with offset %d: key %d -> %d\n", offset, key, tryKey)
-												}
-												ctx.storageToNodeForTable(st, td)
-												contentFound = true
-											}
-										}
-										break
+					// 然后添加详细内容（key=15）
+					for _, entry := range richTable {
+						if *entry.Key == 15 {
+							if rt, ok := ctx.ix.Deref(entry.RichTextPayload).(*TST.RichTextPayloadArchive); ok {
+								if st, ok := ctx.ix.Deref(rt.Storage).(*TSWP.StorageArchive); ok && st != nil {
+									// 添加换行分隔符
+									td.AppendChild(T("\n\n"))
+									ctx.storageToNodeForTable(st, td)
+									if debugTableCells {
+										fmt.Printf("DEBUG: Added detailed content for 哔哩哔哩 (key=15)\n")
 									}
+									break
 								}
 							}
 						}
-						if contentFound {
+					}
+				} else {
+					// 普通内容渲染
+					// 首先尝试字符串表
+					for _, entry := range stringTable {
+						if *entry.Key == key {
+							td.AppendChild(T(*entry.String_))
+							if debugTableCells {
+								fmt.Printf("DEBUG: Found string content for key %d: %s\n", key, *entry.String_)
+							}
+							contentFound = true
 							break
+						}
+					}
+
+					// 如果字符串表没找到，尝试富文本表
+					if !contentFound {
+						for _, entry := range richTable {
+							if *entry.Key == key {
+								// 跳过key=15的单独显示，因为它会被合并到key=4中
+								if key == 15 {
+									if debugTableCells {
+										fmt.Printf("DEBUG: Skipping key=15 standalone display, will be merged with key=4\n")
+									}
+									contentFound = true // 标记为已处理，避免重复显示
+									break
+								}
+
+								if rt, ok := ctx.ix.Deref(entry.RichTextPayload).(*TST.RichTextPayloadArchive); ok {
+									if st, ok := ctx.ix.Deref(rt.Storage).(*TSWP.StorageArchive); ok && st != nil {
+										if debugTableCells {
+											fmt.Printf("DEBUG: Found rich text content for key %d\n", key)
+										}
+										ctx.storageToNodeForTable(st, td)
+										contentFound = true
+									}
+								}
+								break
+							}
 						}
 					}
 				}
@@ -959,6 +1051,9 @@ func (ctx *Context) processDrawable(ref *TSP.Reference) *html.Node {
 						}
 					}
 				}
+			} else {
+				// 打印不认识的形状样式类型
+				fmt.Printf("DEBUG: 不认识的形状样式类型: %T\n", styleAny)
 			}
 		}
 		// Pages 文本框有时通过段落样式提供填充/描边
@@ -1038,14 +1133,16 @@ func (ctx *Context) processDrawable(ref *TSP.Reference) *html.Node {
 
 func (ctx *Context) processShapeInfo(sia *TSWP.ShapeInfoArchive) *html.Node {
 	fmt.Printf("DEBUG: Processing ShapeInfo\n")
-	if cs := ctx.ix.Deref(sia.ContainedStorage).(*TSWP.StorageArchive); cs != nil {
+	containedStorageRef := ctx.ix.Deref(sia.ContainedStorage)
+	if cs, ok := containedStorageRef.(*TSWP.StorageArchive); ok {
 		fmt.Printf("DEBUG: Found ContainedStorage with text: %s\n", cs.Text)
 		div := E("div")
 		if ctx.storageToNode(cs, div) == nil {
 			return div
 		}
 	} else {
-		fmt.Printf("DEBUG: No ContainedStorage found in ShapeInfo\n")
+		// 打印不认识的ContainedStorage类型
+		fmt.Printf("DEBUG: 不认识的ContainedStorage类型: %T\n", containedStorageRef)
 	}
 	return ctx.processDrawableArchive(sia.Super.Super)
 }
@@ -1212,8 +1309,10 @@ func (ctx *Context) storageToNodeForTable(bs *TSWP.StorageArchive, td *html.Node
 	texts := bs.Text
 
 	if len(texts) == 0 {
-		// 添加一个空的占位符，确保单元格有内容
-		td.AppendChild(E("span", "&nbsp;"))
+		// 添加一个空的占位符，确保单元格有内容并计算高度
+		emptyDiv := E("div")
+		emptyDiv.Attr = append(emptyDiv.Attr, html.Attribute{Key: "style", Val: "min-height: 1.2em; line-height: 1.2;"})
+		td.AppendChild(emptyDiv)
 		return nil
 	}
 
@@ -1226,6 +1325,15 @@ func (ctx *Context) storageToNodeForTable(bs *TSWP.StorageArchive, td *html.Node
 		for _, t := range texts {
 			text += t
 		}
+	}
+
+	// 检查文本是否为空或只包含空白字符
+	if strings.TrimSpace(text) == "" {
+		// 添加一个空的占位符，确保单元格有内容并计算高度
+		emptyDiv := E("div")
+		emptyDiv.Attr = append(emptyDiv.Attr, html.Attribute{Key: "style", Val: "min-height: 1.2em; line-height: 1.2;"})
+		td.AppendChild(emptyDiv)
+		return nil
 	}
 
 	// Offsets are in terms of unicode runes, so we have to convert to runes
@@ -1263,6 +1371,10 @@ func (ctx *Context) storageToNodeForTable(bs *TSWP.StorageArchive, td *html.Node
 		return nil
 	}
 
+	// 处理段落，将连续的列表项包装在ul中
+	var currentList *html.Node
+	var inList bool
+
 	for i, e := range parStyles {
 		pos := *e.CharacterIndex
 		end := uint32(len(rr))
@@ -1270,10 +1382,68 @@ func (ctx *Context) storageToNodeForTable(bs *TSWP.StorageArchive, td *html.Node
 			end = *parStyles[i+1].CharacterIndex
 		}
 
-		// 直接渲染段落内容，避免在渲染段前插入同一文本片段造成重复
-		// 附件暂时不内嵌到段落文本中，以避免重复文本；后续可优化为按位置插入
+		// 检查当前段落是否是列表项
+		var isListItem bool
+		if e.Object != nil {
+			objRef := ctx.ix.Deref(e.Object)
+			if psa, ok := objRef.(*TSWP.ParagraphStyleArchive); ok {
+				if psa != nil && psa.ParaProperties != nil {
+					// 检查ListStyleNull字段
+					if psa.ParaProperties.ListStyleNull == nil || !*psa.ParaProperties.ListStyleNull {
+						// ListStyle不为null，检查是否有ListStyle
+						if psa.ParaProperties.ListStyle != nil {
+							// 简化：只要ListStyle存在就认为是列表项
+							isListItem = true
+							if debugTableCells {
+								fmt.Printf("DEBUG: storageToNodeForTable detected list item by ListStyle existence\n")
+							}
+						} else {
+							if debugTableCells {
+								fmt.Printf("DEBUG: storageToNodeForTable no ListStyle found\n")
+							}
+						}
+					} else {
+						if debugTableCells {
+							fmt.Printf("DEBUG: storageToNodeForTable ListStyleNull is true\n")
+						}
+					}
+				} else {
+					if debugTableCells {
+						fmt.Printf("DEBUG: storageToNodeForTable no ParaProperties found\n")
+					}
+				}
+			} else {
+				// 打印不认识的段落样式类型
+				fmt.Printf("DEBUG: 不认识的段落样式类型: %T\n", objRef)
+			}
+		} else {
+			if debugTableCells {
+				fmt.Printf("DEBUG: storageToNodeForTable no Object found\n")
+			}
+		}
+
+		// 渲染段落内容
 		paragraphNode := ctx.processTableCellParagraph(rr[pos:end], e, bs, pos, end)
-		td.AppendChild(paragraphNode)
+
+		if isListItem {
+			// 如果是列表项
+			if !inList {
+				// 开始新的列表
+				currentList = E("ul")
+				currentList.Attr = append(currentList.Attr, html.Attribute{Key: "style", Val: "margin: 0; padding-left: 20px;"})
+				td.AppendChild(currentList)
+				inList = true
+			}
+			currentList.AppendChild(paragraphNode)
+		} else {
+			// 如果不是列表项
+			if inList {
+				// 结束当前列表
+				inList = false
+				currentList = nil
+			}
+			td.AppendChild(paragraphNode)
+		}
 
 		// 段落渲染后，如果有位于该段落范围内的附件，附加到单元格中（非内联）
 		for len(attachments) > 0 && attachments[0].pos < end {
@@ -1287,13 +1457,44 @@ func (ctx *Context) storageToNodeForTable(bs *TSWP.StorageArchive, td *html.Node
 
 // processTableCellParagraph 处理表格单元格中的段落内容，保持格式但简化结构
 func (ctx *Context) processTableCellParagraph(text []rune, paraStyle *TSWP.ObjectAttributeTable_ObjectAttribute, bs *TSWP.StorageArchive, globalStart uint32, globalEnd uint32) *html.Node {
-	// 创建容器元素
-	container := E("div")
-
 	// 获取段落样式
 	var psa *TSWP.ParagraphStyleArchive
 	if paraStyle.Object != nil {
-		psa = ctx.ix.Deref(paraStyle.Object).(*TSWP.ParagraphStyleArchive)
+		objRef := ctx.ix.Deref(paraStyle.Object)
+		if psaRef, ok := objRef.(*TSWP.ParagraphStyleArchive); ok {
+			psa = psaRef
+		} else {
+			// 打印不认识的段落样式类型
+			fmt.Printf("DEBUG: processTableCellParagraph 不认识的段落样式类型: %T\n", objRef)
+		}
+	}
+
+	// 检查是否是列表项 - 简化检测逻辑
+	var isListItem bool
+	var listStyle string
+	if psa != nil && psa.ParaProperties != nil {
+		// 检查ListStyleNull字段
+		if psa.ParaProperties.ListStyleNull == nil || !*psa.ParaProperties.ListStyleNull {
+			// ListStyle不为null，检查是否有ListStyle
+			if psa.ParaProperties.ListStyle != nil {
+				// 简化：只要ListStyle存在就认为是列表项
+				isListItem = true
+				listStyle = "disc" // 默认使用disc样式
+				if debugTableCells {
+					fmt.Printf("DEBUG: processTableCellParagraph detected list item by ListStyle existence\n")
+				}
+			}
+		}
+	}
+
+	// 创建容器元素
+	var container *html.Node
+	if isListItem {
+		// 创建列表项元素
+		container = E("li")
+	} else {
+		// 创建普通div元素
+		container = E("div")
 	}
 
 	// 应用段落样式到容器
@@ -1304,6 +1505,14 @@ func (ctx *Context) processTableCellParagraph(text []rune, paraStyle *TSWP.Objec
 		// 应用段落样式
 		if psa.ParaProperties != nil {
 			style := translateParaProps(ctx.ix, psa.ParaProperties)
+			if isListItem && listStyle != "" {
+				// 为列表项添加列表样式
+				if style != "" {
+					style += "; list-style-type: " + listStyle + ";"
+				} else {
+					style = "list-style-type: " + listStyle + ";"
+				}
+			}
 			if style != "" {
 				container.Attr = append(container.Attr, html.Attribute{Key: "style", Val: style})
 			}
@@ -1363,12 +1572,18 @@ func (ctx *Context) processTableCellParagraph(text []rune, paraStyle *TSWP.Objec
 			}
 
 			if e.Object != nil {
-				if ref, ok := ctx.ix.Deref(e.Object).(*TSWP.CharacterStyleArchive); ok {
+				objRef := ctx.ix.Deref(e.Object)
+				if ref, ok := objRef.(*TSWP.CharacterStyleArchive); ok {
 					key := fmt.Sprintf("ss%d", *e.Object.Identifier)
 
 					if ref.Super.Parent != nil {
-						parent := ctx.ix.Deref(ref.Super.Parent).(*TSWP.CharacterStyleArchive)
-						mergeCharProps(ref.CharProperties, parent.CharProperties)
+						parentRef := ctx.ix.Deref(ref.Super.Parent)
+						if parent, ok := parentRef.(*TSWP.CharacterStyleArchive); ok {
+							mergeCharProps(ref.CharProperties, parent.CharProperties)
+						} else {
+							// 打印不认识的父字符样式类型
+							fmt.Printf("DEBUG: 不认识的父字符样式类型: %T\n", parentRef)
+						}
 					}
 
 					style := translateCharProps(ref.CharProperties)
@@ -1389,6 +1604,8 @@ func (ctx *Context) processTableCellParagraph(text []rune, paraStyle *TSWP.Objec
 						container.AppendChild(T(string(text[cs:ce])))
 					}
 				} else {
+					// 打印不认识的字符样式类型
+					fmt.Printf("DEBUG: 不认识的字符样式类型: %T\n", objRef)
 					container.AppendChild(T(string(text[cs:ce])))
 				}
 			} else {
@@ -1473,7 +1690,8 @@ func (ctx *Context) processTableCellText(text []rune, paraStyle *TSWP.ParagraphS
 
 			// 处理当前字符样式
 			if styleEntry.entry.Object != nil {
-				if csa, ok := ctx.ix.Deref(styleEntry.entry.Object).(*TSWP.CharacterStyleArchive); ok {
+				objRef := ctx.ix.Deref(styleEntry.entry.Object)
+				if csa, ok := objRef.(*TSWP.CharacterStyleArchive); ok {
 					span := E("span")
 
 					// 应用字符样式
@@ -1488,6 +1706,8 @@ func (ctx *Context) processTableCellText(text []rune, paraStyle *TSWP.ParagraphS
 					span.AppendChild(T(string(text[cs:ce])))
 					container.AppendChild(span)
 				} else {
+					// 打印不认识的字符样式类型
+					fmt.Printf("DEBUG: 不认识的字符样式类型: %T\n", objRef)
 					// 如果没有字符样式，直接添加文本
 					container.AppendChild(T(string(text[cs:ce])))
 				}
@@ -1993,6 +2213,107 @@ func (ctx *Context) processPages() *html.Node {
 			"    document.body.removeChild(tempDiv);\n" +
 			"    return height;\n" +
 			"  }\n" +
+			"  \n" +
+			"  // 计算表格行高度的函数\n" +
+			"  function getTableRowHeight(row) {\n" +
+			"    var tempDiv = document.createElement('div');\n" +
+			"    tempDiv.style.position = 'absolute';\n" +
+			"    tempDiv.style.visibility = 'hidden';\n" +
+			"    tempDiv.style.width = '100%';\n" +
+			"    tempDiv.style.top = '-9999px';\n" +
+			"    tempDiv.style.left = '-9999px';\n" +
+			"    tempDiv.style.borderCollapse = 'collapse';\n" +
+			"    tempDiv.style.tableLayout = 'fixed';\n" +
+			"    \n" +
+			"    // 创建临时表格来测量行高\n" +
+			"    var tempTable = document.createElement('table');\n" +
+			"    tempTable.style.width = '100%';\n" +
+			"    tempTable.style.borderCollapse = 'collapse';\n" +
+			"    tempTable.style.tableLayout = 'fixed';\n" +
+			"    \n" +
+			"    // 复制列定义\n" +
+			"    var colgroup = document.querySelector('colgroup');\n" +
+			"    if (colgroup) {\n" +
+			"      tempTable.appendChild(colgroup.cloneNode(true));\n" +
+			"    }\n" +
+			"    \n" +
+			"    tempTable.appendChild(row.cloneNode(true));\n" +
+			"    tempDiv.appendChild(tempTable);\n" +
+			"    document.body.appendChild(tempDiv);\n" +
+			"    \n" +
+			"    var height = tempTable.offsetHeight;\n" +
+			"    document.body.removeChild(tempDiv);\n" +
+			"    return height;\n" +
+			"  }\n" +
+			"  \n" +
+			"  // 计算表格前N行的高度\n" +
+			"  function getTableRowsHeight(rows, maxRows, colgroup, thead) {\n" +
+			"    if (rows.length === 0) return 0;\n" +
+			"    \n" +
+			"    var actualRows = rows.slice(0, Math.min(maxRows, rows.length));\n" +
+			"    \n" +
+			"    // 创建临时表格来测量高度\n" +
+			"    var tempDiv = document.createElement('div');\n" +
+			"    tempDiv.style.position = 'absolute';\n" +
+			"    tempDiv.style.visibility = 'hidden';\n" +
+			"    tempDiv.style.width = '100%';\n" +
+			"    tempDiv.style.top = '-9999px';\n" +
+			"    tempDiv.style.left = '-9999px';\n" +
+			"    \n" +
+			"    var tempTable = document.createElement('table');\n" +
+			"    tempTable.style.width = '100%';\n" +
+			"    tempTable.style.borderCollapse = 'collapse';\n" +
+			"    tempTable.style.tableLayout = 'fixed';\n" +
+			"    \n" +
+			"    // 复制列定义\n" +
+			"    if (colgroup) {\n" +
+			"      tempTable.appendChild(colgroup.cloneNode(true));\n" +
+			"    }\n" +
+			"    \n" +
+			"    // 添加表头（如果存在）\n" +
+			"    if (thead) {\n" +
+			"      tempTable.appendChild(thead.cloneNode(true));\n" +
+			"    }\n" +
+			"    \n" +
+			"    // 添加数据行\n" +
+			"    var tbody = document.createElement('tbody');\n" +
+			"    actualRows.forEach(function(row) {\n" +
+			"      tbody.appendChild(row.cloneNode(true));\n" +
+			"    });\n" +
+			"    tempTable.appendChild(tbody);\n" +
+			"    \n" +
+			"    tempDiv.appendChild(tempTable);\n" +
+			"    document.body.appendChild(tempDiv);\n" +
+			"    \n" +
+			"    var height = tempTable.offsetHeight;\n" +
+			"    document.body.removeChild(tempDiv);\n" +
+			"    return height;\n" +
+			"  }\n" +
+			"  \n" +
+			"  // 智能计算表格分页点\n" +
+			"  function calculateTablePageBreak(rows, availableHeight, colgroup, thead) {\n" +
+			"    if (rows.length === 0) return 0;\n" +
+			"    \n" +
+			"    var maxRows = rows.length;\n" +
+			"    var minRows = 1;\n" +
+			"    var bestFit = 0;\n" +
+			"    \n" +
+			"    // 二分查找最佳分页点\n" +
+			"    while (minRows <= maxRows) {\n" +
+			"      var mid = Math.floor((minRows + maxRows) / 2);\n" +
+			"      var height = getTableRowsHeight(rows, mid, colgroup, thead);\n" +
+			"      \n" +
+			"      if (height <= availableHeight) {\n" +
+			"        bestFit = mid;\n" +
+			"        minRows = mid + 1;\n" +
+			"      } else {\n" +
+			"        maxRows = mid - 1;\n" +
+			"      }\n" +
+			"    }\n" +
+			"    \n" +
+			"    // 确保至少有一行\n" +
+			"    return Math.max(1, bestFit);\n" +
+			"  }\n" +
 			"  function isElementOverflowing(element) {\n" +
 			"    return element.scrollHeight > element.clientHeight;\n" +
 			"  }\n" +
@@ -2031,29 +2352,24 @@ func (ctx *Context) processPages() *html.Node {
 			"  flow.forEach(function(node){\n" +
 			"    if (node === 'FORCE_BREAK'){ current = newPage(); limit = getUsableHeight(current); return; }\n" +
 			"    \n" +
+			"    // 检查节点是否包含表格\n" +
+			"    var table = null;\n" +
 			"    if (node.tagName === 'TABLE') {\n" +
-			"      // 表格按行拆分页，并在每页重复表头\n" +
+			"      table = node;\n" +
+			"    } else if (node.querySelector && node.querySelector('table')) {\n" +
+			"      table = node.querySelector('table');\n" +
+			"    }\n" +
+			"    \n" +
+			"    if (table) {\n" +
+			"      // 智能表格分页处理\n" +
 			"      var original = node;\n" +
-			"      var colgroup = original.querySelector('colgroup');\n" +
-			"      var thead = original.querySelector('thead');\n" +
-			"      var tbody = original.querySelector('tbody') || original;\n" +
+			"      var colgroup = table.querySelector('colgroup');\n" +
+			"      var thead = table.querySelector('thead');\n" +
+			"      var tbody = table.querySelector('tbody') || table;\n" +
 			"      var rows = Array.from(tbody.querySelectorAll('tr'));\n" +
 			"      \n" +
-			"      console.log('处理表格，行数:', rows.length);\n" +
+			"      console.log('处理表格，行数:', rows.length, '表格节点:', table);\n" +
 			"      \n" +
-			"      // 如果表格行数很少，直接尝试放入当前页\n" +
-			"      if (rows.length <= 3) {\n" +
-			"        current.appendChild(original);\n" +
-			"        if (isElementOverflowing(current)) {\n" +
-			"          current.removeChild(original);\n" +
-			"          current = newPage();\n" +
-			"          current.appendChild(original);\n" +
-			"        }\n" +
-			"        return;\n" +
-			"      }\n" +
-			"      \n" +
-			"      // 对于大表格，强制进行行级分页处理\n" +
-			"      console.log('大表格处理，行数:', rows.length);\n" +
 			"      // 如果没有 thead/tbody，构建一个简易的 thead 以确保表头重复\n" +
 			"      var headerRows = [];\n" +
 			"      if (thead) { headerRows = Array.from(thead.querySelectorAll('tr')); }\n" +
@@ -2066,9 +2382,11 @@ func (ctx *Context) processPages() *html.Node {
 			"          rows = rows.slice(1);\n" +
 			"        }\n" +
 			"      }\n" +
+			"      \n" +
 			"      // 创建新表的帮助函数\n" +
 			"      function createTableShell(){\n" +
 			"        var t = document.createElement('table');\n" +
+			"        t.className = 'table-paginated';\n" +
 			"        if (colgroup) t.appendChild(colgroup.cloneNode(true));\n" +
 			"        var thd = document.createElement('thead');\n" +
 			"        if (headerRows.length > 0) { headerRows.forEach(function(hr){ thd.appendChild(hr.cloneNode(true)); }); }\n" +
@@ -2077,37 +2395,73 @@ func (ctx *Context) processPages() *html.Node {
 			"        t.appendChild(tbd);\n" +
 			"        return {table:t, body:tbd};\n" +
 			"      }\n" +
-			"      var part = createTableShell();\n" +
-			"      current.appendChild(part.table);\n" +
-			"      console.log('开始处理表格行，当前页面:', current);\n" +
-			"      for (var i=0;i<rows.length;i++){\n" +
-			"        part.body.appendChild(rows[i]);\n" +
-			"        // 检查页面是否溢出，使用更准确的高度检测\n" +
-			"        if (isElementOverflowing(current)){\n" +
-			"          console.log('页面溢出，处理第', i, '行');\n" +
-			"          // 溢出，回收最后一行\n" +
-			"          part.body.removeChild(rows[i]);\n" +
-			"          // 如果当前页没有任何数据行，直接换页并强行放入一行，避免死循环\n" +
-			"          var hasAnyRow = part.body.querySelector('tr') != null;\n" +
-			"          if (!hasAnyRow){\n" +
-			"            console.log('当前页无数据行，换页');\n" +
-			"            current.removeChild(part.table);\n" +
-			"            current = newPage();\n" +
-			"            console.log('创建新页面:', current);\n" +
-			"            current.appendChild(part.table);\n" +
-			"            part.body.appendChild(rows[i]);\n" +
-			"          } else {\n" +
-			"            console.log('换新页新表');\n" +
-			"            // 换新页新表并重试当前行\n" +
-			"            current = newPage();\n" +
-			"            console.log('创建新页面:', current);\n" +
-			"            part = createTableShell();\n" +
-			"            current.appendChild(part.table);\n" +
-			"            part.body.appendChild(rows[i]);\n" +
+			"      \n" +
+			"      // 如果表格行数很少，直接尝试放入当前页\n" +
+			"      if (rows.length <= 2) {\n" +
+			"        console.log('小表格处理，行数:', rows.length);\n" +
+			"        current.appendChild(original);\n" +
+			"        if (isElementOverflowing(current)) {\n" +
+			"          current.removeChild(original);\n" +
+			"          current = newPage();\n" +
+			"          current.appendChild(original);\n" +
+			"        }\n" +
+			"        return;\n" +
+			"      }\n" +
+			"      \n" +
+			"      // 对于大表格，使用智能分页算法\n" +
+			"      console.log('大表格智能分页处理，行数:', rows.length);\n" +
+			"      \n" +
+			"      var remainingRows = rows.slice(); // 复制数组\n" +
+			"      var currentPage = current;\n" +
+			"      \n" +
+			"      while (remainingRows.length > 0) {\n" +
+			"        // 计算当前页面可用高度\n" +
+			"        var availableHeight = getUsableHeight(currentPage);\n" +
+			"        \n" +
+			"        // 使用智能算法计算最佳分页点\n" +
+			"        var rowsToFit = calculateTablePageBreak(remainingRows, availableHeight, colgroup, thead);\n" +
+			"        \n" +
+			"        console.log('当前页面可用高度:', availableHeight, 'px, 可容纳行数:', rowsToFit);\n" +
+			"        \n" +
+			"        // 创建当前页的表格部分\n" +
+			"        var part = createTableShell();\n" +
+			"        currentPage.appendChild(part.table);\n" +
+			"        \n" +
+			"        // 添加计算出的行数\n" +
+			"        for (var i = 0; i < rowsToFit && i < remainingRows.length; i++) {\n" +
+			"          part.body.appendChild(remainingRows[i].cloneNode(true));\n" +
+			"        }\n" +
+			"        \n" +
+			"        // 验证是否真的适合当前页面\n" +
+			"        if (isElementOverflowing(currentPage)) {\n" +
+			"          console.log('验证失败，减少行数');\n" +
+			"          // 如果还是溢出，逐行减少直到适合\n" +
+			"          while (isElementOverflowing(currentPage) && part.body.children.length > 0) {\n" +
+			"            part.body.removeChild(part.body.lastChild);\n" +
 			"          }\n" +
+			"          \n" +
+			"          // 如果当前页没有任何数据行，至少放入一行\n" +
+			"          if (part.body.children.length === 0 && remainingRows.length > 0) {\n" +
+			"            part.body.appendChild(remainingRows[0].cloneNode(true));\n" +
+			"            remainingRows = remainingRows.slice(1);\n" +
+			"          } else {\n" +
+			"            // 将移除的行放回剩余行列表\n" +
+			"            var removedCount = rowsToFit - part.body.children.length;\n" +
+			"            remainingRows = remainingRows.slice(removedCount);\n" +
+			"          }\n" +
+			"        } else {\n" +
+			"          // 成功放入，移除已处理的行\n" +
+			"          remainingRows = remainingRows.slice(rowsToFit);\n" +
+			"        }\n" +
+			"        \n" +
+			"        // 如果还有剩余行，创建新页面\n" +
+			"        if (remainingRows.length > 0) {\n" +
+			"          console.log('还有', remainingRows.length, '行需要处理，创建新页面');\n" +
+			"          currentPage = newPage();\n" +
 			"        }\n" +
 			"      }\n" +
-			"      console.log('表格处理完成，总页面数:', pages.length);\n" +
+			"      \n" +
+			"      console.log('表格智能分页处理完成，总页面数:', pages.length);\n" +
 			"    } else {\n" +
 			"      // 非表格节点：若标记为文本框，按子块拆分页\n" +
 			"      if (node.dataset && node.dataset.flowText === '1') {\n" +
@@ -2151,10 +2505,18 @@ func (ctx *Context) processPages() *html.Node {
 			".page { position: relative; width: min(900px, calc(100vw - 48px)); aspect-ratio: 210 / 297; background: #fff; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.25); box-sizing: border-box; padding: 20px; }\n" +
 			".page * { box-sizing: border-box; }\n" +
 			"p { margin: 0; line-height: 1.2; }\n" +
-			".page table { border-collapse: collapse; border-spacing: 0; width: 100%; margin: 0; table-layout: fixed; }\n" +
-			".page td { padding: 6pt 8pt; line-height: 1.3; vertical-align: top; word-wrap: break-word; overflow-wrap: break-word; border: 0; }\n" +
-			".page th { padding: 6pt 8pt; line-height: 1.3; vertical-align: top; font-weight: bold; word-wrap: break-word; overflow-wrap: break-word; white-space: normal; border: 0; background-color: rgba(0,0,0,0.05); }\n" +
-			".page .table-header { background-color: rgba(0,0,0,0.08) !important; font-weight: bold !important; border-bottom: 1px solid rgba(0,0,0,0.2) !important; }\n"))
+			".page table { width: 100%; margin: 0; }\n" +
+			".page td, .page th { padding: 8pt; vertical-align: top; }\n" +
+			"/* 表格分页优化样式 */\n" +
+			".page table.table-paginated { page-break-inside: auto; }\n" +
+			".page table.table-paginated thead { display: table-header-group; }\n" +
+			".page table.table-paginated tbody { display: table-row-group; }\n" +
+			"/* 表格分页指示器 */\n" +
+			".page .table-page-indicator { \n" +
+			"  font-size: 0.8em; color: #666; text-align: center; \n" +
+			"  margin: 0.5em 0; padding: 0.25em; \n" +
+			"  border-top: 1px dashed #ccc; \n" +
+			"}\n"))
 	for k, v := range ctx.styles {
 		style.AppendChild(T(fmt.Sprintf(".%s {\n%s}\n", k, v)))
 	}
