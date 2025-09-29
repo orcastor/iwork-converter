@@ -93,7 +93,7 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive, ocr func(io.Reader) 
 		for r, rinfo := range tile.RowInfos {
 			offsets := make([]uint16, len(rinfo.CellOffsets)/2)
 			binary.Read(bytes.NewBuffer(rinfo.CellOffsets), LE, offsets)
-			// Naïvely assuming that the index is the column number, per the stringrayreader code.
+			// Navely assuming that the index is the column number, per the stringrayreader code.
 			// FIXME - figure out the right way to determine column number.
 			for c, offset := range offsets {
 				if uint32(c) >= cc {
