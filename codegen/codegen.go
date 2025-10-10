@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"os"
+	"strings"
 	"text/template"
 )
 
@@ -16,24 +17,12 @@ func must(err error) {
 var foo = `
 package index
 import (
-    "errors"
-    "github.com/golang/protobuf/proto"
+    {{if eq .FunctionName "Common"}}"errors"
     "fmt"
-    "github.com/orcastor/iwork-converter/proto/TSP"
-    "github.com/orcastor/iwork-converter/proto/TSK"
-    "github.com/orcastor/iwork-converter/proto/TSS"
-    "github.com/orcastor/iwork-converter/proto/TSD"
-    "github.com/orcastor/iwork-converter/proto/TSWP"
-    "github.com/orcastor/iwork-converter/proto/TSCH"
-    PreUFF "github.com/orcastor/iwork-converter/proto/TSCH/PreUFF"
-    "github.com/orcastor/iwork-converter/proto/TSCH_Generated"
-    "github.com/orcastor/iwork-converter/proto/TSCK"
-    "github.com/orcastor/iwork-converter/proto/TSCE"
-    "github.com/orcastor/iwork-converter/proto/TST"
-    "github.com/orcastor/iwork-converter/proto/TSA"
-    "github.com/orcastor/iwork-converter/proto/KN"
+    {{end}}"github.com/golang/protobuf/proto"
     "github.com/orcastor/iwork-converter/proto/TN"
-    "github.com/orcastor/iwork-converter/proto/TP"
+    "github.com/orcastor/iwork-converter/proto/TST"
+    "github.com/orcastor/iwork-converter/proto/TSWP"
 )
 
 func decode{{.FunctionName}}(typ uint32, payload []byte) (interface{}, error) {
@@ -71,7 +60,9 @@ func main() {
 	// Add function name to the data
 	info["FunctionName"] = os.Args[2]
 
-	tmpl, err := template.New("test").Parse(foo)
+	tmpl, err := template.New("test").Funcs(template.FuncMap{
+		"hasPrefix": strings.HasPrefix,
+	}).Parse(foo)
 	must(err)
 
 	must(tmpl.Execute(os.Stdout, info))

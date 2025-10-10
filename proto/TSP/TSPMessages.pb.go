@@ -346,7 +346,7 @@ func (Path_ElementType) EnumDescriptor() ([]byte, []int) {
 
 type Reference struct {
 	state                protoimpl.MessageState `protogen:"open.v1"`
-	Identifier           *uint64                `protobuf:"varint,1,req,name=identifier" json:"identifier,omitempty"`
+	Identifier           *uint64                `protobuf:"varint,1,opt,name=identifier" json:"identifier,omitempty"`
 	DeprecatedType       *int32                 `protobuf:"varint,2,opt,name=deprecated_type,json=deprecatedType" json:"deprecated_type,omitempty"`
 	DeprecatedIsExternal *bool                  `protobuf:"varint,3,opt,name=deprecated_is_external,json=deprecatedIsExternal" json:"deprecated_is_external,omitempty"`
 	unknownFields        protoimpl.UnknownFields
@@ -1075,8 +1075,8 @@ func (x *ReferenceDictionary) GetEntries() []*ReferenceDictionary_Entry {
 
 type UUID struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Lower         *uint64                `protobuf:"varint,1,req,name=lower" json:"lower,omitempty"`
-	Upper         *uint64                `protobuf:"varint,2,req,name=upper" json:"upper,omitempty"`
+	Lower         *uint64                `protobuf:"varint,1,opt,name=lower" json:"lower,omitempty"`
+	Upper         *uint64                `protobuf:"varint,2,opt,name=upper" json:"upper,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2874,7 +2874,7 @@ const file_TSPMessages_proto_rawDesc = "" +
 	"\x11TSPMessages.proto\x12\x03TSP\x1a google/protobuf/descriptor.proto\"\x8a\x01\n" +
 	"\tReference\x12\x1e\n" +
 	"\n" +
-	"identifier\x18\x01 \x02(\x04R\n" +
+	"identifier\x18\x01 \x01(\x04R\n" +
 	"identifier\x12'\n" +
 	"\x0fdeprecated_type\x18\x02 \x01(\x05R\x0edeprecatedType\x124\n" +
 	"\x16deprecated_is_external\x18\x03 \x01(\bR\x14deprecatedIsExternal\"/\n" +
@@ -2951,8 +2951,8 @@ const file_TSPMessages_proto_rawDesc = "" +
 	"\x03key\x18\x01 \x02(\v2\x0e.TSP.ReferenceR\x03key\x12$\n" +
 	"\x05value\x18\x02 \x02(\v2\x0e.TSP.ReferenceR\x05value\"2\n" +
 	"\x04UUID\x12\x14\n" +
-	"\x05lower\x18\x01 \x02(\x04R\x05lower\x12\x14\n" +
-	"\x05upper\x18\x02 \x02(\x04R\x05upper\"\x92\x01\n" +
+	"\x05lower\x18\x01 \x01(\x04R\x05lower\x12\x14\n" +
+	"\x05upper\x18\x02 \x01(\x04R\x05upper\"\x92\x01\n" +
 	"\rCFUUIDArchive\x12\x1d\n" +
 	"\n" +
 	"uuid_bytes\x18\x01 \x01(\fR\tuuidBytes\x12\x17\n" +

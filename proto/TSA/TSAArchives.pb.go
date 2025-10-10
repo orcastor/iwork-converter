@@ -27,7 +27,7 @@ const (
 
 type DocumentArchive struct {
 	state                          protoimpl.MessageState               `protogen:"open.v1"`
-	Super                          *TSK.DocumentArchive                 `protobuf:"bytes,1,req,name=super" json:"super,omitempty"`
+	Super                          *TSK.DocumentArchive                 `protobuf:"bytes,1,opt,name=super" json:"super,omitempty"`
 	TextPresetDisplayItems         []*TSWP.TextPresetDisplayItemArchive `protobuf:"bytes,2,rep,name=text_preset_display_items,json=textPresetDisplayItems" json:"text_preset_display_items,omitempty"`
 	CreationLanguage               *string                              `protobuf:"bytes,3,opt,name=creation_language,json=creationLanguage" json:"creation_language,omitempty"`
 	CalculationEngine              *TSP.Reference                       `protobuf:"bytes,4,opt,name=calculation_engine,json=calculationEngine" json:"calculation_engine,omitempty"`
@@ -303,7 +303,7 @@ const file_TSAArchives_proto_rawDesc = "" +
 	"\n" +
 	"\x11TSAArchives.proto\x12\x03TSA\x1a\x11TSKArchives.proto\x1a\x11TSPMessages.proto\x1a\x12TSWPArchives.proto\x1a\x11TSSArchives.proto\"\xc4\x04\n" +
 	"\x0fDocumentArchive\x12*\n" +
-	"\x05super\x18\x01 \x02(\v2\x14.TSK.DocumentArchiveR\x05super\x12]\n" +
+	"\x05super\x18\x01 \x01(\v2\x14.TSK.DocumentArchiveR\x05super\x12]\n" +
 	"\x19text_preset_display_items\x18\x02 \x03(\v2\".TSWP.TextPresetDisplayItemArchiveR\x16textPresetDisplayItems\x12+\n" +
 	"\x11creation_language\x18\x03 \x01(\tR\x10creationLanguage\x12=\n" +
 	"\x12calculation_engine\x18\x04 \x01(\v2\x0e.TSP.ReferenceR\x11calculationEngine\x12-\n" +

@@ -7,7 +7,7 @@ import "TSSArchives.proto";
 package TSA;
 option go_package = "github.com/orcastor/iwork-converter/proto/TSA";
 message DocumentArchive {
-  required .TSK.DocumentArchive super = 1;
+  optional .TSK.DocumentArchive super = 1;
   repeated .TSWP.TextPresetDisplayItemArchive text_preset_display_items = 2;
   optional string creation_language = 3;
   optional .TSP.Reference calculation_engine = 4;

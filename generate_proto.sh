@@ -30,6 +30,7 @@ protoc --go_out=. --go_opt=paths=source_relative \
     --go_opt=Mproto/TSPMessages.proto=github.com/orcastor/iwork-converter/proto/TSP \
     --go_opt=Mproto/TSPArchiveMessages.proto=github.com/orcastor/iwork-converter/proto/TSP \
     --go_opt=Mproto/TSPDatabaseMessages.proto=github.com/orcastor/iwork-converter/proto/TSP \
+    --proto_path=proto \
     proto/TSPMessages.proto proto/TSPArchiveMessages.proto proto/TSPDatabaseMessages.proto
 
 # TSK相关
@@ -96,6 +97,7 @@ protoc --go_out=. --go_opt=paths=source_relative \
 echo "生成TSCH Generated文件..."
 protoc --go_out=. --go_opt=paths=source_relative \
     --go_opt=Mproto/TSCHArchives.GEN.proto=github.com/orcastor/iwork-converter/proto/TSCH_Generated \
+    --proto_path=proto \
     proto/TSCHArchives.GEN.proto
 
 # TSCH PreUFF

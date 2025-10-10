@@ -22,6 +22,14 @@ import (
 	"github.com/orcastor/iwork-converter/proto/TSWP"
 )
 
+// Global debug mode flag
+var debugMode bool
+
+// SetDebugMode sets the global debug mode
+func SetDebugMode(debug bool) {
+	debugMode = debug
+}
+
 type Context struct {
 	ix *index.Index
 	zr *zip.ReadCloser
@@ -318,7 +326,9 @@ func ConvertString(in string, ocr func(io.Reader) (string, error)) (string, erro
 	}
 	defer ctx.zr.Close()
 
-	fmt.Println("Read", len(ctx.ix.Records), "records")
+	if debugMode {
+		fmt.Println("Read", len(ctx.ix.Records), "records")
+	}
 
 	var doc string
 	switch ctx.ix.Type {

@@ -27,7 +27,7 @@ enum SpotlightMetadataType {
 }
 
 message Reference {
-  required uint64 identifier = 1;
+  optional uint64 identifier = 1;
   optional int32 deprecated_type = 2;
   optional bool deprecated_is_external = 3;
 }
@@ -132,8 +132,8 @@ message ReferenceDictionary {
 }
 
 message UUID {
-  required uint64 lower = 1;
-  required uint64 upper = 2;
+  optional uint64 lower = 1;
+  optional uint64 upper = 2;
 }
 
 message CFUUIDArchive {

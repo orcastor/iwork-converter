@@ -935,10 +935,10 @@ func (x *RelativeCellRefArchive) GetIsSpanningRow() bool {
 type RangeReferenceArchive struct {
 	state             protoimpl.MessageState `protogen:"open.v1"`
 	TableId           *TSP.CFUUIDArchive     `protobuf:"bytes,1,req,name=table_id,json=tableId" json:"table_id,omitempty"`
-	TopLeftColumn     *uint32                `protobuf:"varint,2,req,name=top_left_column,json=topLeftColumn" json:"top_left_column,omitempty"`
-	TopLeftRow        *uint32                `protobuf:"varint,3,req,name=top_left_row,json=topLeftRow" json:"top_left_row,omitempty"`
-	BottomRightColumn *uint32                `protobuf:"varint,4,req,name=bottom_right_column,json=bottomRightColumn" json:"bottom_right_column,omitempty"`
-	BottomRightRow    *uint32                `protobuf:"varint,5,req,name=bottom_right_row,json=bottomRightRow" json:"bottom_right_row,omitempty"`
+	TopLeftColumn     *uint32                `protobuf:"varint,2,opt,name=top_left_column,json=topLeftColumn" json:"top_left_column,omitempty"`
+	TopLeftRow        *uint32                `protobuf:"varint,3,opt,name=top_left_row,json=topLeftRow" json:"top_left_row,omitempty"`
+	BottomRightColumn *uint32                `protobuf:"varint,4,opt,name=bottom_right_column,json=bottomRightColumn" json:"bottom_right_column,omitempty"`
+	BottomRightRow    *uint32                `protobuf:"varint,5,opt,name=bottom_right_row,json=bottomRightRow" json:"bottom_right_row,omitempty"`
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
@@ -4948,7 +4948,7 @@ func (x *FormulaTranslationFlagsArchive) GetReturnsPercentFormatted() bool {
 
 type FormulaArchive struct {
 	state                protoimpl.MessageState          `protogen:"open.v1"`
-	ASTNodeArray         *ASTNodeArrayArchive            `protobuf:"bytes,1,req,name=AST_node_array,json=ASTNodeArray" json:"AST_node_array,omitempty"`
+	ASTNodeArray         *ASTNodeArrayArchive            `protobuf:"bytes,1,opt,name=AST_node_array,json=ASTNodeArray" json:"AST_node_array,omitempty"`
 	HostColumn           *uint32                         `protobuf:"varint,2,opt,name=host_column,json=hostColumn" json:"host_column,omitempty"`
 	HostRow              *uint32                         `protobuf:"varint,3,opt,name=host_row,json=hostRow" json:"host_row,omitempty"`
 	HostColumnIsNegative *bool                           `protobuf:"varint,4,opt,name=host_column_is_negative,json=hostColumnIsNegative,def=0" json:"host_column_is_negative,omitempty"`
@@ -10451,11 +10451,11 @@ const file_TSCEArchives_proto_rawDesc = "" +
 	"\x0fis_spanning_row\x18\a \x01(\bR\risSpanningRow\"\xea\x01\n" +
 	"\x15RangeReferenceArchive\x12-\n" +
 	"\btable_id\x18\x01 \x02(\v2\x12.TSP.CFUUIDArchiveR\atableId\x12&\n" +
-	"\x0ftop_left_column\x18\x02 \x02(\rR\rtopLeftColumn\x12 \n" +
-	"\ftop_left_row\x18\x03 \x02(\rR\n" +
+	"\x0ftop_left_column\x18\x02 \x01(\rR\rtopLeftColumn\x12 \n" +
+	"\ftop_left_row\x18\x03 \x01(\rR\n" +
 	"topLeftRow\x12.\n" +
-	"\x13bottom_right_column\x18\x04 \x02(\rR\x11bottomRightColumn\x12(\n" +
-	"\x10bottom_right_row\x18\x05 \x02(\rR\x0ebottomRightRow\"n\n" +
+	"\x13bottom_right_column\x18\x04 \x01(\rR\x11bottomRightColumn\x12(\n" +
+	"\x10bottom_right_row\x18\x05 \x01(\rR\x0ebottomRightRow\"n\n" +
 	"\x1dInternalRangeReferenceArchive\x12\x19\n" +
 	"\bowner_id\x18\x01 \x02(\rR\aownerId\x122\n" +
 	"\x05range\x18\x02 \x02(\v2\x1c.TSCE.RangeCoordinateArchiveR\x05range\"\x9f\x01\n" +
@@ -11074,7 +11074,7 @@ const file_TSCEArchives_proto_rawDesc = "" +
 	"\x1acontains_frozen_references\x18\x04 \x01(\b:\x05falseR\x18containsFrozenReferences\x12A\n" +
 	"\x19returns_percent_formatted\x18\x05 \x01(\b:\x05falseR\x17returnsPercentFormatted\"\xe7\x03\n" +
 	"\x0eFormulaArchive\x12?\n" +
-	"\x0eAST_node_array\x18\x01 \x02(\v2\x19.TSCE.ASTNodeArrayArchiveR\fASTNodeArray\x12\x1f\n" +
+	"\x0eAST_node_array\x18\x01 \x01(\v2\x19.TSCE.ASTNodeArrayArchiveR\fASTNodeArray\x12\x1f\n" +
 	"\vhost_column\x18\x02 \x01(\rR\n" +
 	"hostColumn\x12\x19\n" +
 	"\bhost_row\x18\x03 \x01(\rR\ahostRow\x12<\n" +

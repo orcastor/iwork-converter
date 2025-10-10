@@ -29,5 +29,9 @@
 	"12027": "TN.DocumentArchive",
 	"12028": "TN.SheetSelectionArchive",
 	"12029": "TN.DocumentArchive",
-	"12030": "TN.DocumentArchive"
+	"12030": "TN.DocumentArchive",
+	"3061": "TST.TableModelArchive",
+	"6030": "TST.TableModelArchive",
+	"6267": "TST.TableModelArchive",
+	"6305": "TST.TableModelArchive"
 }

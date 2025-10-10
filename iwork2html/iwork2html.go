@@ -28,6 +28,14 @@ import (
 	"golang.org/x/net/html"
 )
 
+// Global debug mode flag
+var debugMode bool
+
+// SetDebugMode sets the global debug mode
+func SetDebugMode(debug bool) {
+	debugMode = debug
+}
+
 // T is a helper function for building html text nodes.
 func T(value string) *html.Node {
 	return &html.Node{Type: html.TextNode, Data: cleanText(value)}
@@ -86,7 +94,7 @@ type Attachment struct {
 }
 
 func (ctx *Context) processImage(image *TSD.ImageArchive) *html.Node {
-	if debugImages {
+	if debugMode && debugImages {
 		fmt.Printf("DEBUG IMG: processing image, dataId=%d\n", *image.Data.Identifier)
 	}
 	dataId := *image.Data.Identifier
@@ -96,13 +104,15 @@ func (ctx *Context) processImage(image *TSD.ImageArchive) *html.Node {
 		if dataId == *data.Identifier {
 			if data.FileName != nil {
 				src = *data.FileName
-				if debugImages {
+				if debugMode && debugImages {
 					fmt.Printf("DEBUG IMG: use FileName=%s for dataId=%d\n", src, dataId)
 				}
 			} else {
-				fmt.Printf("No filename: %#v\n", data)
+				if debugMode {
+					fmt.Printf("No filename: %#v\n", data)
+				}
 				src = *data.PreferredFileName
-				if debugImages {
+				if debugMode && debugImages {
 					fmt.Printf("DEBUG IMG: use PreferredFileName=%s for dataId=%d\n", src, dataId)
 				}
 			}
@@ -112,7 +122,7 @@ func (ctx *Context) processImage(image *TSD.ImageArchive) *html.Node {
 	// not sure if this is px or pt.  It's px on the html side.
 	width := fmt.Sprintf("%f", *image.OriginalSize.Width)
 	height := fmt.Sprintf("%f", *image.OriginalSize.Height)
-	if debugImages {
+	if debugMode && debugImages {
 		fmt.Printf("DEBUG IMG: original size width=%s height=%s for src=%s\n", width, height, src)
 	}
 	return E("img", []string{"src", "", "width", width, "height", height, "class", "img_" + fmt.Sprint(dataId)})
@@ -173,7 +183,7 @@ func (ctx *Context) applyCellStyle(tm *TST.TableModelArchive, key uint32) string
 						}
 					} else if psa, ok := entryRef.(*TSWP.ParagraphStyleArchive); ok {
 						// Handle paragraph styles as cell styles
-						if debugTableCells {
+						if debugMode && debugTableCells {
 							fmt.Printf("DEBUG: Processing ParagraphStyleArchive for key %d\n", key)
 							fmt.Printf("DEBUG: ParaProperties: %v\n", psa.ParaProperties != nil)
 							if psa.ParaProperties != nil {
@@ -341,11 +351,6 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
 				stringTable = tdl.Entries
 				if debugTableCells {
 					fmt.Printf("DEBUG: StringTable loaded with %d entries\n", len(stringTable))
-					for i, entry := range stringTable {
-						if i < 5 { // Only show first 5 entries
-							fmt.Printf("DEBUG: StringTable[%d]: key=%d, value=%s\n", i, *entry.Key, *entry.String_)
-						}
-					}
 				}
 			} else {
 				if debugTableCells {
@@ -425,11 +430,6 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
 	// Smart table structure detection: if only a few columns have content, it might be a table structure error
 	if debugTableCells {
 		fmt.Printf("DEBUG: Active columns: %d out of %d total columns\n", activeColumnCount, cc)
-		for i, active := range activeColumns {
-			if active {
-				fmt.Printf("DEBUG: Column %d is active\n", i)
-			}
-		}
 	}
 
 	// Note: Smart restructuring is disabled - we now use proper column detection instead
@@ -441,18 +441,17 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
 	// Generate column definitions - intelligent width allocation
 	colgroup := E("colgroup")
 
-	// Simplified approach: check if this is a single-column layout where all content goes to first column
-	// This handles the common case where Pages documents use multi-column tables but put all content in column 0
+	// Check which columns actually have content by analyzing the data
 	hasContentColumns := make([]bool, cc)
-	if cc == 1 {
-		// Single column table - always has content in column 0
-		hasContentColumns[0] = true
-	} else {
-		// Multi-column table - for now, assume content is in first column
-		// This is a common pattern in Pages where tables are used for layout
-		hasContentColumns[0] = true
-		// Other columns default to false (no content)
+
+	// For Numbers tables, assume all columns have content unless proven otherwise
+	// This is different from Pages where tables are often used for layout
+	for i := 0; i < cc; i++ {
+		hasContentColumns[i] = true
 	}
+
+	// TODO: In the future, we could analyze the actual cell data to determine
+	// which columns really have content, but for now assume all columns are active
 
 	// Calculate the number of columns with content
 	contentColumnCount := 0
@@ -502,7 +501,6 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
 	// Use global row numbers across tiles to determine header/footer, and correctly parse/fill each cell
 	// Note: Remove key usage tracking because the same key may need to be used in multiple cells
 	// usedKeys := make(map[uint32]bool) // Commented out to avoid blocking duplicate content
-	globalRow := 0
 
 	// Only treat first row as header if NumberOfHeaderRows is explicitly set
 	shouldTreatFirstRowAsHeader := false
@@ -525,8 +523,9 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
 		RowInfo  *TST.TileRowInfo
 	}
 
-	// Track used keys to avoid duplicates
-	usedKeys := make(map[uint32]bool)
+	// Track used keys per row to avoid duplicates within the same row
+	// Note: Same key can be used in different rows (e.g., header content)
+	usedKeys := make(map[string]bool) // Use "row:key" format to allow same key in different rows
 
 	// Build a map of tile ID to tile for quick lookup
 	tileMap := make(map[uint32]*TST.Tile)
@@ -543,7 +542,22 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
 				fmt.Printf("DEBUG: RowTileTree[%d]: rowIndex=%d, tileId=%d\n", i, *node.Key, *node.Value)
 			}
 		}
-		for _, node := range tm.BaseDataStore.RowTileTree.Nodes {
+
+		// Sort nodes by key (rowIndex) to get correct order
+		nodes := make([]*TST.TableRBTree_Node, len(tm.BaseDataStore.RowTileTree.Nodes))
+		copy(nodes, tm.BaseDataStore.RowTileTree.Nodes)
+		sort.Slice(nodes, func(i, j int) bool {
+			return *nodes[i].Key < *nodes[j].Key
+		})
+
+		if debugTableCells {
+			fmt.Printf("DEBUG: Sorted RowTileTree nodes by rowIndex:\n")
+			for i, node := range nodes {
+				fmt.Printf("DEBUG: Sorted[%d]: rowIndex=%d, tileId=%d\n", i, *node.Key, *node.Value)
+			}
+		}
+
+		for _, node := range nodes {
 			rowIndex := *node.Key
 			tileId := *node.Value
 			if tile, exists := tileMap[tileId]; exists {
@@ -568,15 +582,37 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
 
 	// If rowTileTree is not available or empty, fall back to original method
 	if len(orderedRows) == 0 {
+		if debugTableCells {
+			fmt.Printf("DEBUG: RowTileTree is empty or nil, using fallback method with original tile order\n")
+		}
+
+		// Fallback: Use original tile order (as stored in the file)
 		for _, tinfo := range tm.BaseDataStore.Tiles.Tiles {
 			tile := ctx.ix.Deref(tinfo.Tile).(*TST.Tile)
 			for _, rinfo := range tile.RowInfos {
+				// Use TileRowIndex as the row index for ordering
+				rowIndex := uint32(0)
+				if rinfo.TileRowIndex != nil {
+					rowIndex = *rinfo.TileRowIndex
+				}
 				orderedRows = append(orderedRows, struct {
 					RowIndex uint32
 					Tile     *TST.Tile
 					RowInfo  *TST.TileRowInfo
-				}{0, tile, rinfo}) // Use 0 as default row index
+				}{rowIndex, tile, rinfo})
 			}
+		}
+
+		// Sort by TileRowIndex to maintain consistent order
+		sort.Slice(orderedRows, func(i, j int) bool {
+			if orderedRows[i].RowInfo.TileRowIndex != nil && orderedRows[j].RowInfo.TileRowIndex != nil {
+				return *orderedRows[i].RowInfo.TileRowIndex < *orderedRows[j].RowInfo.TileRowIndex
+			}
+			return i < j // Fallback to insertion order
+		})
+
+		if debugTableCells {
+			fmt.Printf("DEBUG: Fallback method processed %d rows\n", len(orderedRows))
 		}
 	} else {
 		// Check if rowTileTree contains all rows, if not, supplement with remaining rows
@@ -622,14 +658,14 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
 		}
 	}
 
-	for _, rowData := range orderedRows {
+	for r, rowData := range orderedRows {
 		rinfo := rowData.RowInfo
 		tr := E("tr")
-		// Header row determined by global row number or smart detection result
+		// Header row determined by row number or smart detection result
 		isHeaderRow := false
-		if tm.NumberOfHeaderRows != nil && globalRow < int(*tm.NumberOfHeaderRows) {
+		if tm.NumberOfHeaderRows != nil && r < int(*tm.NumberOfHeaderRows) {
 			isHeaderRow = true
-		} else if shouldTreatFirstRowAsHeader && globalRow == 0 {
+		} else if shouldTreatFirstRowAsHeader && r == 0 {
 			isHeaderRow = true
 		}
 
@@ -646,6 +682,10 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
 		// Use original content offsets
 		contentOffsets := offsets
 
+		if debugTableCells && r < 3 {
+			fmt.Printf("DEBUG: Row %d - Raw offsets: %v\n", r, offsets)
+		}
+
 		// Only process columns that have content
 		actualColIndex := 0
 		for c := 0; c < cc; c++ {
@@ -660,7 +700,7 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
 				cellTag = "th"
 				// Debug: print header style information
 				if debugTableCells {
-					fmt.Printf("DEBUG: Header row %d, col %d (actual col %d) - checking for header styles\n", globalRow, c, actualColIndex)
+					fmt.Printf("DEBUG: Header row %d, col %d (actual col %d) - checking for header styles\n", r, c, actualColIndex)
 				}
 			} else {
 				cellTag = "td"
@@ -673,30 +713,33 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
 			//	td.Attr = append(td.Attr, html.Attribute{Key: "class", Val: "table-header"})
 			// }
 			// Add debug attributes
-			td.Attr = append(td.Attr, html.Attribute{Key: "data-row", Val: fmt.Sprintf("%d", globalRow)})
+			td.Attr = append(td.Attr, html.Attribute{Key: "data-row", Val: fmt.Sprintf("%d", r)})
 			// Use actualColIndex for the final table structure
 			td.Attr = append(td.Attr, html.Attribute{Key: "data-col", Val: fmt.Sprintf("%d", actualColIndex)})
 			tr.AppendChild(td)
 
+			// Increment actualColIndex after processing this cell
+			actualColIndex++
+
 			// Apply basic positioning styles
-			basicStyle := ctx.applyPositionBasedStyle(tm, globalRow, c, shouldTreatFirstRowAsHeader)
+			basicStyle := ctx.applyPositionBasedStyle(tm, r, c, shouldTreatFirstRowAsHeader)
 			if basicStyle != "" {
 				td.Attr = append(td.Attr, html.Attribute{Key: "style", Val: basicStyle})
 			}
 
 			// Use rearranged content offsets
-			if c >= len(contentOffsets) {
-				continue
+			var offset uint16 = 65535 // Default to empty cell
+			if len(contentOffsets) > 0 && c < len(contentOffsets) {
+				offset = contentOffsets[c]
 			}
-			offset := contentOffsets[c]
-			if offset == 65535 { // Empty cell
-				continue
-			}
+
+			// Since all offsets are 65535 (empty), we need to use StringTable-based content allocation
+			// This is the correct approach for Numbers tables
 
 			// Redesigned: simplified cell content retrieval logic
 			// No longer relies on complex cellType judgment, directly try all possible content retrieval methods
 			if debugTableCells {
-				fmt.Printf("DEBUG: Processing cell at row %d, col %d, offset=%d\n", globalRow, c, offset)
+				fmt.Printf("DEBUG: Processing cell at row %d, col %d, offset=%d\n", r, c, offset)
 				if int(offset)+16 <= len(rinfo.CellStorageBuffer) {
 					fmt.Printf("DEBUG: Buffer[%d:%d] = %v\n", offset, offset+16, rinfo.CellStorageBuffer[offset:offset+16])
 				} else {
@@ -708,101 +751,126 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
 			var key uint32
 			contentFound := false
 
-			// Try different offsets to find the key
-			if len(rinfo.CellStorageBuffer) > int(offset)+8 {
-				// Try different possible key locations
-				possibleKeys := []uint32{
-					LE.Uint32(rinfo.CellStorageBuffer[offset+4 : offset+8]),  // Original location
-					LE.Uint32(rinfo.CellStorageBuffer[offset : offset+4]),    // At start
-					LE.Uint32(rinfo.CellStorageBuffer[offset+8 : offset+12]), // After original
-				}
+			// Only try buffer parsing if offset is not 65535
+			if offset != 65535 {
+				// Try different offsets to find the key
+				if len(rinfo.CellStorageBuffer) > int(offset)+8 {
+					// Try different possible key locations
+					possibleKeys := []uint32{
+						LE.Uint32(rinfo.CellStorageBuffer[offset+4 : offset+8]),   // Original location
+						LE.Uint32(rinfo.CellStorageBuffer[offset : offset+4]),     // At start
+						LE.Uint32(rinfo.CellStorageBuffer[offset+8 : offset+12]),  // After original
+						LE.Uint32(rinfo.CellStorageBuffer[offset+12 : offset+16]), // Further after original
+					}
 
+					if debugTableCells {
+						fmt.Printf("DEBUG: Trying to read key from buffer at different offsets: %v\n", possibleKeys)
+					}
+
+					// First, check if any of the possible keys exist in richTable (highest priority)
+					for _, possibleKey := range possibleKeys {
+						if possibleKey == 0 || possibleKey == 65535 {
+							continue // Skip invalid keys
+						}
+
+						// Skip if this key has already been used in this row
+						keyStr := fmt.Sprintf("%d:%d", r, possibleKey)
+						if usedKeys[keyStr] {
+							if debugTableCells {
+								fmt.Printf("DEBUG: Key %d already used in row %d, skipping\n", possibleKey, r)
+							}
+							continue
+						}
+
+						// Check if this key value exists in richTable first (highest priority)
+						if len(richTable) > 0 {
+							for _, entry := range richTable {
+								if *entry.Key == possibleKey {
+									key = possibleKey
+									contentFound = true
+									usedKeys[keyStr] = true // Mark as used in this row
+									if debugTableCells {
+										fmt.Printf("DEBUG: Found matching key %d in richTable\n", key)
+									}
+									break
+								}
+							}
+						}
+
+						if contentFound {
+							break
+						}
+					}
+
+					// If no richTable key found, check stringTable
+					if !contentFound {
+						for _, possibleKey := range possibleKeys {
+							if possibleKey == 0 || possibleKey == 65535 {
+								continue // Skip invalid keys
+							}
+
+							// Skip if this key has already been used in this row
+							keyStr := fmt.Sprintf("%d:%d", r, possibleKey)
+							if usedKeys[keyStr] {
+								if debugTableCells {
+									fmt.Printf("DEBUG: Key %d already used in row %d, skipping\n", possibleKey, r)
+								}
+								continue
+							}
+
+							// Check if this key value exists in stringTable
+							if len(stringTable) > 0 {
+								for _, entry := range stringTable {
+									if *entry.Key == possibleKey {
+										key = possibleKey
+										contentFound = true
+										usedKeys[keyStr] = true // Mark as used in this row
+										if debugTableCells {
+											fmt.Printf("DEBUG: Found matching key %d in stringTable\n", key)
+										}
+										break
+									}
+								}
+							}
+
+							if contentFound {
+								break
+							}
+						}
+					}
+				}
+			} else {
 				if debugTableCells {
-					fmt.Printf("DEBUG: Trying to read key from buffer at different offsets: %v\n", possibleKeys)
-				}
-
-				// Check each possible key
-				for _, possibleKey := range possibleKeys {
-					if possibleKey == 0 || possibleKey == 65535 {
-						continue // Skip invalid keys
-					}
-
-					// Skip if this key has already been used
-					if usedKeys[possibleKey] {
-						if debugTableCells {
-							fmt.Printf("DEBUG: Key %d already used, skipping\n", possibleKey)
-						}
-						continue
-					}
-
-					// Check if this key value exists in richTable
-					if len(richTable) > 0 {
-						for _, entry := range richTable {
-							if *entry.Key == possibleKey {
-								key = possibleKey
-								contentFound = true
-								usedKeys[possibleKey] = true // Mark as used
-								if debugTableCells {
-									fmt.Printf("DEBUG: Found matching key %d in richTable\n", key)
-								}
-								break
-							}
-						}
-					}
-
-					// If not found in richTable, check stringTable
-					if !contentFound && len(stringTable) > 0 {
-						for _, entry := range stringTable {
-							if *entry.Key == possibleKey {
-								key = possibleKey
-								contentFound = true
-								usedKeys[possibleKey] = true // Mark as used
-								if debugTableCells {
-									fmt.Printf("DEBUG: Found matching key %d in stringTable\n", key)
-								}
-								break
-							}
-						}
-					}
-
-					if contentFound {
-						break
-					}
+					fmt.Printf("DEBUG: Skipping buffer parsing for empty cell (offset=65535)\n")
 				}
 			}
 
-			// Simplified content allocation strategy
+			// Improved content allocation strategy
 			if !contentFound {
-				// Only assign content to the first column, other columns remain empty
-				if c == 0 {
-					// Normal allocation: StringTable + RichTextTable
-					if globalRow < len(stringTable) {
-						// First allocate StringTable content
-						key = *stringTable[globalRow].Key
-						if debugTableCells {
-							fmt.Printf("DEBUG: Cell at row %d, col %d assigned key %d from stringTable[%d]\n",
-								globalRow, c, key, globalRow)
-						}
-					} else if (globalRow - len(stringTable)) < len(richTable) {
-						// Then allocate RichTextTable content
-						richIndex := globalRow - len(stringTable)
-						key = *richTable[richIndex].Key
-						if debugTableCells {
-							fmt.Printf("DEBUG: Cell at row %d, col %d assigned key %d from richTable[%d]\n",
-								globalRow, c, key, richIndex)
-						}
-					} else {
-						// Rows beyond content range remain empty
-						if debugTableCells {
-							fmt.Printf("DEBUG: Cell at row %d, col %d left empty (beyond content range) - stringTable: %d, richTable: %d\n",
-								globalRow, c, len(stringTable), len(richTable))
-						}
-						continue
+				// Try to find content by checking all available content sources
+				// Use a more intelligent approach: try to find content by row and column
+
+				// Calculate the actual content index based on the table structure
+				// For Numbers tables, content is typically stored in row-major order
+				contentIndex := r*int(cc) + c
+
+				if debugTableCells && r < 3 && c < 3 {
+					fmt.Printf("DEBUG: Cell at row %d, col %d, calculated contentIndex: %d (stringTable has %d entries)\n",
+						r, c, contentIndex, len(stringTable))
+				}
+
+				// First, try to find content by calculated index in stringTable
+				if contentIndex < len(stringTable) {
+					key = *stringTable[contentIndex].Key
+					if debugTableCells && r < 3 && c < 3 {
+						fmt.Printf("DEBUG: Cell at row %d, col %d assigned key %d from stringTable[%d] (calculated index)\n",
+							r, c, key, contentIndex)
 					}
 				} else {
-					// Non-first columns remain empty, but still need to create cells to maintain table structure
-					if debugTableCells {
-						fmt.Printf("DEBUG: Cell at row %d, col %d left empty (not first column)\n", globalRow, c)
+					// Beyond content range, leave empty
+					if debugTableCells && r < 6 {
+						fmt.Printf("DEBUG: Cell at row %d, col %d left empty (beyond content range) - stringTable: %d, contentIndex: %d\n",
+							r, c, len(stringTable), contentIndex)
 					}
 					// Add empty placeholder to ensure cell has minimum height
 					emptyDiv := E("div")
@@ -812,9 +880,59 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
 				}
 			}
 
+			// Debug: print the key that will be used for content lookup (only for first few cells)
+			if debugTableCells && r < 3 && c < 3 {
+				fmt.Printf("DEBUG: Cell at row %d, col %d will use key %d for content lookup\n", r, c, key)
+			}
+
 			// Apply cell-specific styles from StyleTable
-			if key != 0 {
-				cellStyle := ctx.applyCellStyle(tm, key)
+			// For header rows, try to use a style that has background color
+			styleKey := key
+			if r == 0 && tm.BaseDataStore != nil && tm.BaseDataStore.StyleTable != nil {
+				// Try to find a style with background color for header row
+				styleTableRef := ctx.ix.Deref(tm.BaseDataStore.StyleTable)
+				if tdl, ok := styleTableRef.(*TST.TableDataList); ok {
+					for _, entry := range tdl.Entries {
+						if entry.Key != nil && entry.Reference != nil {
+							entryRef := ctx.ix.Deref(entry.Reference)
+							if csa, ok := entryRef.(*TST.CellStyleArchive); ok {
+								if csa.CellProperties != nil && csa.CellProperties.CellFill != nil {
+									// Found a style with background color, use it for header
+									styleKey = *entry.Key
+									if debugTableCells {
+										fmt.Printf("DEBUG: Using style key %d for header row (has background color)\n", styleKey)
+									}
+									break
+								}
+							}
+						}
+					}
+				}
+			}
+
+			// For non-header rows, ensure they don't use background color styles
+			if r > 0 && tm.BaseDataStore != nil && tm.BaseDataStore.StyleTable != nil {
+				styleTableRef := ctx.ix.Deref(tm.BaseDataStore.StyleTable)
+				if tdl, ok := styleTableRef.(*TST.TableDataList); ok {
+					// Try to find a plain text style (ParagraphStyleArchive) for content rows
+					for _, entry := range tdl.Entries {
+						if entry.Key != nil && entry.Reference != nil {
+							entryRef := ctx.ix.Deref(entry.Reference)
+							if _, ok := entryRef.(*TSWP.ParagraphStyleArchive); ok {
+								// Found a paragraph style, use it for content rows
+								styleKey = *entry.Key
+								if debugTableCells {
+									fmt.Printf("DEBUG: Using style key %d for content row %d (plain text style)\n", styleKey, r)
+								}
+								break
+							}
+						}
+					}
+				}
+			}
+
+			if styleKey != 0 {
+				cellStyle := ctx.applyCellStyle(tm, styleKey)
 				if cellStyle != "" {
 					// Merge with existing basic style
 					existingStyle := ""
@@ -827,6 +945,15 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
 					if existingStyle != "" {
 						cellStyle = existingStyle + ";" + cellStyle
 					}
+
+					// Add center alignment for header rows
+					if r == 0 {
+						cellStyle += ";text-align: center;"
+						if debugTableCells {
+							fmt.Printf("DEBUG: Added center alignment for header row\n")
+						}
+					}
+
 					// Update or add style attribute
 					styleFound := false
 					for i, attr := range td.Attr {
@@ -849,7 +976,7 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
 			contentFound = false
 
 			if debugTableCells {
-				fmt.Printf("DEBUG: Looking for content with key %d for cell at row %d, col %d\n", key, globalRow, c)
+				fmt.Printf("DEBUG: Looking for content with key %d for cell at row %d, col %d\n", key, r, c)
 			}
 
 			// Normal content rendering
@@ -885,14 +1012,10 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
 
 			if !contentFound {
 				if debugTableCells {
-					fmt.Printf("DEBUG: No content found for cell at row %d, col %d with key %d\n", globalRow, c, key)
+					fmt.Printf("DEBUG: No content found for cell at row %d, col %d with key %d\n", r, c, key)
 				}
 			}
-
-			// Increment the actual column index for the next content column
-			actualColIndex++
 		}
-		globalRow++
 	}
 	rval := E("div")
 	if tm.TableName != nil {
@@ -1086,10 +1209,14 @@ func (ctx *Context) processDrawable(ref *TSP.Reference) *html.Node {
 }
 
 func (ctx *Context) processShapeInfo(sia *TSWP.ShapeInfoArchive) *html.Node {
-	fmt.Printf("DEBUG: Processing ShapeInfo\n")
+	if debugMode {
+		fmt.Printf("DEBUG: Processing ShapeInfo\n")
+	}
 	containedStorageRef := ctx.ix.Deref(sia.OwnedStorage)
 	if cs, ok := containedStorageRef.(*TSWP.StorageArchive); ok {
-		fmt.Printf("DEBUG: Found ContainedStorage with text: %s\n", cs.Text)
+		if debugMode {
+			fmt.Printf("DEBUG: Found ContainedStorage with text: %s\n", cs.Text)
+		}
 		div := E("div")
 		if ctx.storageToNode(cs, div) == nil {
 			return div
@@ -2093,7 +2220,9 @@ func Convert(in, out string) error {
 	}
 	defer ctx.zr.Close()
 
-	fmt.Println("Read", len(ctx.ix.Records), "records")
+	if debugMode {
+		fmt.Println("Read", len(ctx.ix.Records), "records")
+	}
 
 	var doc *html.Node
 	// set global for font scaling hook
@@ -2658,7 +2787,9 @@ func (ctx *Context) processNumbers() *html.Node {
 
 // processKeynote translates a keynote file.
 func (ctx *Context) processKeynote() *html.Node {
-	fmt.Printf("DEBUG: processKeynote called with %d records\n", len(ctx.ix.Records))
+	if debugMode {
+		fmt.Printf("DEBUG: processKeynote called with %d records\n", len(ctx.ix.Records))
+	}
 
 	// Root of output document
 	head, body := E("head", "\n", E("meta", []string{"charset", "utf-8"}), "\n"), E("body", "\n")
@@ -2680,7 +2811,9 @@ func (ctx *Context) processKeynote() *html.Node {
 	ids := []uint64{}
 	if slideTreeSlides != nil {
 		// Use SlideTree.Slides order and check IsSkipped field
-		fmt.Printf("DEBUG: Using SlideTree.Slides order with %d slides\n", len(slideTreeSlides))
+		if debugMode {
+			fmt.Printf("DEBUG: Using SlideTree.Slides order with %d slides\n", len(slideTreeSlides))
+		}
 		for _, slideRef := range slideTreeSlides {
 			if slideRef != nil && slideRef.Identifier != nil {
 				slideNodeId := *slideRef.Identifier
@@ -2689,23 +2822,31 @@ func (ctx *Context) processKeynote() *html.Node {
 					if slideNode.Slide != nil && slideNode.Slide.Identifier != nil {
 						actualSlideId := *slideNode.Slide.Identifier
 						ids = append(ids, actualSlideId)
-						fmt.Printf("DEBUG: Added slide %d to display list\n", actualSlideId)
+						if debugMode {
+							fmt.Printf("DEBUG: Added slide %d to display list\n", actualSlideId)
+						}
 					}
 				}
 			}
 		}
 	} else {
 		// Fallback to original method
-		fmt.Printf("DEBUG: Using fallback method\n")
+		if debugMode {
+			fmt.Printf("DEBUG: Using fallback method\n")
+		}
 		for key, rec := range ctx.ix.Records {
 			if _, ok := rec.(*KN.SlideArchive); ok {
 				ids = append(ids, key)
-				fmt.Printf("DEBUG: Found slide at record %d\n", key)
+				if debugMode {
+					fmt.Printf("DEBUG: Found slide at record %d\n", key)
+				}
 			}
 		}
 		sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
 	}
-	fmt.Printf("DEBUG: Final slide count for display: %d\n", len(ids))
+	if debugMode {
+		fmt.Printf("DEBUG: Final slide count for display: %d\n", len(ids))
+	}
 
 	// Read canvas size to set slide aspect ratio precisely
 	canvasW := 1920.0
@@ -2715,7 +2856,9 @@ func (ctx *Context) processKeynote() *html.Node {
 			if sh.Size != nil && sh.Size.Width != nil && sh.Size.Height != nil {
 				canvasW = float64(*sh.Size.Width)
 				canvasH = float64(*sh.Size.Height)
-				fmt.Printf("DEBUG: Canvas size: %.0f x %.0f\n", canvasW, canvasH)
+				if debugMode {
+					fmt.Printf("DEBUG: Canvas size: %.0f x %.0f\n", canvasW, canvasH)
+				}
 			}
 			break
 		}
