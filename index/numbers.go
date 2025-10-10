@@ -1,9 +1,9 @@
 package index
 
 import (
+	"github.com/golang/protobuf/proto"
 	"github.com/orcastor/iwork-converter/proto/TN"
 	"github.com/orcastor/iwork-converter/proto/TSWP"
-	"github.com/golang/protobuf/proto"
 )
 
 func decodeNumbers(typ uint32, payload []byte) (interface{}, error) {
@@ -20,22 +20,22 @@ func decodeNumbers(typ uint32, payload []byte) (interface{}, error) {
 		return value, err
 
 	case 12002:
-		var value = &TN.CommandSheetInsertDrawablesArchive{}
+		var value = &TN.DocumentArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 12003:
-		var value = &TN.CommandDocumentInsertSheetArchive{}
+		var value = &TN.DocumentArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 12004:
-		var value = &TN.CommandDocumentRemoveSheetArchive{}
+		var value = &TN.DocumentArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 12005:
-		var value = &TN.CommandSetSheetNameArchive{}
+		var value = &TN.DocumentArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
@@ -45,12 +45,12 @@ func decodeNumbers(typ uint32, payload []byte) (interface{}, error) {
 		return value, err
 
 	case 12007:
-		var value = &TN.CommandPasteDrawablesArchive{}
+		var value = &TN.DocumentArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 12008:
-		var value = &TN.CommandDocumentReorderSheetArchive{}
+		var value = &TN.DocumentArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
@@ -60,57 +60,57 @@ func decodeNumbers(typ uint32, payload []byte) (interface{}, error) {
 		return value, err
 
 	case 12010:
-		var value = &TN.CommandPasteSheetArchive{}
+		var value = &TN.DocumentArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 12011:
-		var value = &TN.CommandReorderSidebarItemChildrenAchive{}
+		var value = &TN.DocumentArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 12012:
-		var value = &TN.CommandSheetRemoveDrawablesArchive{}
+		var value = &TN.DocumentArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 12013:
-		var value = &TN.CommandSheetMoveDrawableZOrderArchive{}
+		var value = &TN.DocumentArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 12014:
-		var value = &TN.CommandChartMediatorSetEditingState{}
+		var value = &TN.DocumentArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 12015:
-		var value = &TN.CommandFormChooseTargetTableArchive{}
+		var value = &TN.DocumentArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 12016:
-		var value = &TN.CommandChartMediatorUpdateForEntityDelete{}
+		var value = &TN.DocumentArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 12017:
-		var value = &TN.CommandSetPageOrientationArchive{}
+		var value = &TN.DocumentArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 12018:
-		var value = &TN.CommandSetContentScaleArchive{}
+		var value = &TN.DocumentArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 12019:
-		var value = &TN.CommandSetShowPageNumbersValueArchive{}
+		var value = &TN.DocumentArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 12021:
-		var value = &TN.CommandSetAutofitValueArchive{}
+		var value = &TN.DocumentArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
@@ -120,7 +120,7 @@ func decodeNumbers(typ uint32, payload []byte) (interface{}, error) {
 		return value, err
 
 	case 12025:
-		var value = &TN.CommandDocumentReplaceLastSheetArchive{}
+		var value = &TN.DocumentArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
@@ -130,7 +130,7 @@ func decodeNumbers(typ uint32, payload []byte) (interface{}, error) {
 		return value, err
 
 	case 12027:
-		var value = &TN.ChartCommandSelectionBehaviorArchive{}
+		var value = &TN.DocumentArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
@@ -140,12 +140,12 @@ func decodeNumbers(typ uint32, payload []byte) (interface{}, error) {
 		return value, err
 
 	case 12029:
-		var value = &TN.SheetCommandSelectionBehaviorArchive{}
+		var value = &TN.DocumentArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 12030:
-		var value = &TN.CommandSetDocumentPrinterOptions{}
+		var value = &TN.DocumentArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
@@ -165,6 +165,9 @@ func decodeNumbers(typ uint32, payload []byte) (interface{}, error) {
 		return value, err
 
 	default:
+
+		// 兜底逻辑：尝试使用decodeCommon
 		return decodeCommon(typ, payload)
+
 	}
 }

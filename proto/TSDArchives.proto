@@ -1,9 +1,10 @@
 syntax = "proto2";
 
+package TSD;
+option go_package = "github.com/orcastor/iwork-converter/proto/TSD";
 import "TSPMessages.proto";
 import "TSKArchives.proto";
 import "TSSArchives.proto";
-package TSD;
 
 enum LineJoin {
   MiterJoin = 0;
@@ -33,7 +34,8 @@ message PointPathSourceArchive {
     kTSDStar = 100;
     kTSDPlus = 200;
   }
-  optional .TSD.PointPathSourceArchive.PointPathSourceType type = 1;
+
+  optional PointPathSourceArchive.PointPathSourceType type = 1;
   optional .TSP.Point point = 2;
   optional .TSP.Size naturalSize = 3;
 }
@@ -44,13 +46,15 @@ message ScalarPathSourceArchive {
     kTSDRegularPolygon = 1;
     kTSDChevron = 2;
   }
-  optional .TSD.ScalarPathSourceArchive.ScalarPathSourceType type = 1;
+
+  optional ScalarPathSourceArchive.ScalarPathSourceType type = 1;
   optional float scalar = 2;
   optional .TSP.Size naturalSize = 3;
+  optional bool is_curve_continuous = 4;
 }
 
 message BezierPathSourceArchive {
-  optional string path_string = 1 [deprecated = true];
+  optional string path_string = 1;
   optional .TSP.Size naturalSize = 2;
   optional .TSP.Path path = 3;
 }
@@ -68,41 +72,47 @@ message ConnectionLinePathSourceArchive {
     kTSDConnectionLineTypeQuadratic = 0;
     kTSDConnectionLineTypeOrthogonal = 1;
   }
-  required .TSD.BezierPathSourceArchive super = 1;
-  optional .TSD.ConnectionLinePathSourceArchive.ConnectionLinePathSourceType type = 2;
+
+  required BezierPathSourceArchive super = 1;
+  optional ConnectionLinePathSourceArchive.ConnectionLinePathSourceType type = 2;
   optional float outset_from = 3;
   optional float outset_to = 4;
 }
 
 message EditableBezierPathSourceArchive {
-  message Node {
-    required .TSP.Point inControlPoint = 1;
-    required .TSP.Point nodePoint = 2;
-    required .TSP.Point outControlPoint = 3;
-    required .TSD.EditableBezierPathSourceArchive.NodeType type = 4;
-  }
-  message Subpath {
-    repeated .TSD.EditableBezierPathSourceArchive.Node nodes = 1;
-    required bool closed = 2;
-  }
   enum NodeType {
     sharp = 1;
     bezier = 2;
     smooth = 3;
   }
-  repeated .TSD.EditableBezierPathSourceArchive.Subpath subpaths = 1;
+
+  message Node {
+    required .TSP.Point inControlPoint = 1;
+    required .TSP.Point nodePoint = 2;
+    required .TSP.Point outControlPoint = 3;
+    required EditableBezierPathSourceArchive.NodeType type = 4;
+  }
+
+  message Subpath {
+    repeated EditableBezierPathSourceArchive.Node nodes = 1;
+    required bool closed = 2;
+  }
+
+  repeated EditableBezierPathSourceArchive.Subpath subpaths = 1;
   optional .TSP.Size naturalSize = 2;
 }
 
 message PathSourceArchive {
   optional bool horizontalFlip = 1;
   optional bool verticalFlip = 2;
-  optional .TSD.PointPathSourceArchive point_path_source = 3;
-  optional .TSD.ScalarPathSourceArchive scalar_path_source = 4;
-  optional .TSD.BezierPathSourceArchive bezier_path_source = 5;
-  optional .TSD.CalloutPathSourceArchive callout_path_source = 6;
-  optional .TSD.ConnectionLinePathSourceArchive connection_line_path_source = 7;
-  optional .TSD.EditableBezierPathSourceArchive editable_bezier_path_source = 8;
+  optional PointPathSourceArchive point_path_source = 3;
+  optional ScalarPathSourceArchive scalar_path_source = 4;
+  optional BezierPathSourceArchive bezier_path_source = 5;
+  optional CalloutPathSourceArchive callout_path_source = 6;
+  optional ConnectionLinePathSourceArchive connection_line_path_source = 7;
+  optional EditableBezierPathSourceArchive editable_bezier_path_source = 8;
+  optional string localizationKey = 9;
+  optional string userDefinedName = 10;
 }
 
 message AngleGradientArchive {
@@ -116,21 +126,23 @@ message TransformGradientArchive {
 }
 
 message GradientArchive {
+  enum GradientType {
+    Linear = 0;
+    Radial = 1;
+  }
+
   message GradientStop {
     optional .TSP.Color color = 1;
     optional float fraction = 2;
     optional float inflection = 3;
   }
-  enum GradientType {
-    Linear = 0;
-    Radial = 1;
-  }
-  optional .TSD.GradientArchive.GradientType type = 1;
-  repeated .TSD.GradientArchive.GradientStop stops = 2;
+
+  optional GradientArchive.GradientType type = 1;
+  repeated GradientArchive.GradientStop stops = 2;
   optional float opacity = 3;
   optional bool advancedGradient = 4;
-  optional .TSD.AngleGradientArchive anglegradient = 5;
-  optional .TSD.TransformGradientArchive transformgradient = 6;
+  optional AngleGradientArchive anglegradient = 5;
+  optional TransformGradientArchive transformgradient = 6;
 }
 
 message ImageFillArchive {
@@ -141,21 +153,22 @@ message ImageFillArchive {
     ScaleToFill = 3;
     ScaleToFit = 4;
   }
+
   optional .TSP.DataReference imagedata = 6;
-  optional .TSD.ImageFillArchive.ImageFillTechnique technique = 2 [default = NaturalSize];
+  optional ImageFillArchive.ImageFillTechnique technique = 2 [default = NaturalSize];
   optional .TSP.Color tint = 3;
   optional .TSP.Size fillsize = 4;
   optional .TSP.DataReference originalimagedata = 7;
   optional bool interpretsUntaggedImageDataAsGeneric = 8;
+  optional .TSP.Color referencecolor = 9;
   optional .TSP.Reference database_imagedata = 1;
   optional .TSP.Reference database_originalimagedata = 5;
 }
 
 message FillArchive {
   optional .TSP.Color color = 1;
-  optional .TSD.GradientArchive gradient = 2;
-  optional .TSD.ImageFillArchive image = 3;
-  extensions 100 to 536870911;
+  optional GradientArchive gradient = 2;
+  optional ImageFillArchive image = 3;
 }
 
 message StrokePatternArchive {
@@ -164,7 +177,8 @@ message StrokePatternArchive {
     TSDSolidPattern = 1;
     TSDEmptyPattern = 2;
   }
-  optional .TSD.StrokePatternArchive.StrokePatternType type = 1;
+
+  optional StrokePatternArchive.StrokePatternType type = 1;
   optional float phase = 2;
   optional uint32 count = 3;
   repeated float pattern = 4;
@@ -176,21 +190,23 @@ message StrokeArchive {
     RoundCap = 1;
     SquareCap = 2;
   }
+
   optional .TSP.Color color = 1;
   optional float width = 2;
-  optional .TSD.StrokeArchive.LineCap cap = 3;
-  optional .TSD.LineJoin join = 4;
-  optional float miterLimit = 5;
-  optional .TSD.StrokePatternArchive pattern = 6;
-  optional .TSD.SmartStrokeArchive smartStroke = 7;
-  optional .TSD.FrameArchive frame = 8;
-  optional .TSD.PatternedStrokeArchive patterned_stroke = 9;
+  optional StrokeArchive.LineCap cap = 3;
+  optional LineJoin join = 4;
+  optional float miter_limit = 5;
+  optional StrokePatternArchive pattern = 6;
+  optional SmartStrokeArchive smart_stroke = 7;
+  optional FrameArchive frame = 8;
+  optional PatternedStrokeArchive patterned_stroke = 9;
 }
 
 message SmartStrokeArchive {
-  optional string strokeName = 2;
-  optional int32 randomSeed = 3;
+  optional string stroke_name = 2;
+  optional uint32 random_seed = 3;
   optional .TSP.ReferenceDictionary parameterValues = 4;
+  optional double pattern_offset_distance = 5;
 }
 
 message FrameArchive {
@@ -204,7 +220,7 @@ message PatternedStrokeArchive {
 
 message LineEndArchive {
   optional .TSP.Path path = 1;
-  optional .TSD.LineJoin line_join = 2 [default = MiterJoin];
+  optional LineJoin line_join = 2 [default = MiterJoin];
   optional .TSP.Point end_point = 3;
   optional bool is_filled = 4;
   optional string identifier = 5;
@@ -216,16 +232,17 @@ message ShadowArchive {
     TSDContactShadow = 1;
     TSDCurvedShadow = 2;
   }
+
   optional .TSP.Color color = 1;
   optional float angle = 2 [default = 315];
   optional float offset = 3 [default = 5];
   optional int32 radius = 4 [default = 1];
   optional float opacity = 5 [default = 1];
   optional bool is_enabled = 6 [default = true];
-  optional .TSD.ShadowArchive.ShadowType type = 7 [default = TSDDropShadow];
-  optional .TSD.DropShadowArchive dropShadow = 8;
-  optional .TSD.ContactShadowArchive contactShadow = 9;
-  optional .TSD.CurvedShadowArchive curvedShadow = 10;
+  optional ShadowArchive.ShadowType type = 7 [default = TSDDropShadow];
+  optional DropShadowArchive dropShadow = 8;
+  optional ContactShadowArchive contactShadow = 9;
+  optional CurvedShadowArchive curvedShadow = 10;
 }
 
 message DropShadowArchive {
@@ -262,92 +279,113 @@ message ImageAdjustmentsArchive {
 }
 
 message ShapeStylePropertiesArchive {
-  optional .TSD.FillArchive fill = 1;
-  optional .TSD.StrokeArchive stroke = 2;
+  optional FillArchive fill = 1;
+  optional StrokeArchive stroke = 2;
   optional float opacity = 3;
-  optional .TSD.ShadowArchive shadow = 4;
-  optional .TSD.ReflectionArchive reflection = 5;
+  optional ShadowArchive shadow = 4;
+  optional ReflectionArchive reflection = 5;
+  optional LineEndArchive head_line_end = 6;
+  optional LineEndArchive tail_line_end = 7;
 }
 
 message ShapeStyleArchive {
   required .TSS.StyleArchive super = 1;
   optional uint32 override_count = 10 [default = 0];
-  optional .TSD.ShapeStylePropertiesArchive shape_properties = 11;
+  optional ShapeStylePropertiesArchive shape_properties = 11;
 }
 
 message MediaStylePropertiesArchive {
-  optional .TSD.StrokeArchive stroke = 1;
+  optional StrokeArchive stroke = 1;
   optional float opacity = 2;
-  optional .TSD.ShadowArchive shadow = 3;
-  optional .TSD.ReflectionArchive reflection = 4;
+  optional ShadowArchive shadow = 3;
+  optional ReflectionArchive reflection = 4;
 }
 
 message MediaStyleArchive {
   required .TSS.StyleArchive super = 1;
   optional uint32 override_count = 10 [default = 0];
-  optional .TSD.MediaStylePropertiesArchive media_properties = 11;
+  optional MediaStylePropertiesArchive media_properties = 11;
 }
 
 message ThemePresetsArchive {
-  repeated .TSD.FillArchive gradient_fill_presets = 1;
-  repeated .TSD.FillArchive image_fill_presets = 2;
-  repeated .TSD.ShadowArchive shadow_presets = 3;
+  repeated FillArchive gradient_fill_presets = 1;
+  repeated FillArchive image_fill_presets = 2;
+  repeated ShadowArchive shadow_presets = 3;
   repeated .TSP.Reference line_style_presets = 4;
   repeated .TSP.Reference shape_style_presets = 5;
   repeated .TSP.Reference textbox_style_presets = 6;
   repeated .TSP.Reference image_style_presets = 7;
   repeated .TSP.Reference movie_style_presets = 8;
-  extend .TSS.ThemeArchive {
-    optional .TSD.ThemePresetsArchive extension = 100;
-  }
+  repeated .TSP.Reference drawing_line_style_presets = 9;
 }
 
 message ThemeReplaceFillPresetCommandArchive {
   required .TSK.CommandArchive super = 1;
   required .TSP.Reference theme = 2;
-  required .TSD.FillArchive fill = 3;
-  required .TSD.FillArchive old_fill = 4;
+  required FillArchive fill = 3;
+  required FillArchive old_fill = 4;
   required uint32 index = 5;
 }
 
 message DrawableArchive {
-  optional .TSD.GeometryArchive geometry = 1;
+  optional GeometryArchive geometry = 1;
   optional .TSP.Reference parent = 2;
-  optional .TSD.ExteriorTextWrapArchive exterior_text_wrap = 3;
+  optional ExteriorTextWrapArchive exterior_text_wrap = 3;
   optional string hyperlink_url = 4;
   optional bool locked = 5;
   optional .TSP.Reference comment = 6;
   optional bool aspect_ratio_locked = 7;
   optional string accessibility_description = 8;
+  repeated .TSP.Reference pencil_annotations = 9;
+  optional .TSP.Reference title = 10;
+  optional .TSP.Reference caption = 11;
+  optional bool title_hidden = 12;
+  optional bool caption_hidden = 13;
 }
 
 message ContainerArchive {
-  optional .TSD.GeometryArchive geometry = 1;
+  optional GeometryArchive geometry = 1;
   optional .TSP.Reference parent = 2;
   repeated .TSP.Reference children = 3;
 }
 
 message GroupArchive {
-  required .TSD.DrawableArchive super = 1;
+  required DrawableArchive super = 1;
   repeated .TSP.Reference children = 2;
+  optional .TSP.Reference fake_shape_for_empty_group = 3;
+}
+
+message FreehandDrawingAnimationArchive {
+  optional double duration = 1;
+  optional bool should_loop = 2;
+}
+
+message FreehandDrawingArchive {
+  optional .TSP.Reference spacer_shape = 1;
+  optional double opacity = 2;
+  optional FreehandDrawingAnimationArchive animation = 3;
+  optional double last_clamped_scale = 4;
 }
 
 message ShapeArchive {
-  required .TSD.DrawableArchive super = 1;
+  required DrawableArchive super = 1;
   optional .TSP.Reference style = 2;
-  optional .TSD.PathSourceArchive pathsource = 3;
-  optional .TSD.LineEndArchive head_line_end = 4;
-  optional .TSD.LineEndArchive tail_line_end = 5;
+  optional PathSourceArchive pathsource = 3;
+  optional LineEndArchive head_line_end = 4;
+  optional LineEndArchive tail_line_end = 5;
+  optional float strokePatternOffsetDistance = 6;
 }
 
 message ConnectionLineArchive {
-  required .TSD.ShapeArchive super = 1;
+  required ShapeArchive super = 1;
   optional .TSP.Reference connected_from = 2;
   optional .TSP.Reference connected_to = 3;
+  optional .TSP.UUID connected_to_uuid = 4;
+  optional .TSP.UUID connected_from_uuid = 5;
 }
 
 message ImageArchive {
-  required .TSD.DrawableArchive super = 1;
+  required DrawableArchive super = 1;
   optional .TSP.DataReference data = 11;
   optional .TSP.Reference style = 3;
   optional .TSP.Size originalSize = 4;
@@ -355,9 +393,10 @@ message ImageArchive {
   optional .TSP.DataReference thumbnailData = 12;
   optional uint32 flags = 7;
   optional .TSP.DataReference originalData = 13;
+  optional .TSP.DataReference originalSVGData = 23;
   optional .TSP.Size naturalSize = 9;
   optional .TSP.Path instantAlphaPath = 10;
-  optional .TSD.ImageAdjustmentsArchive imageAdjustments = 14;
+  optional ImageAdjustmentsArchive imageAdjustments = 14;
   optional .TSP.DataReference enhancedImageData = 17;
   optional .TSP.DataReference adjustedImageData = 15;
   optional .TSP.DataReference thumbnailAdjustedImageData = 16;
@@ -365,28 +404,49 @@ message ImageArchive {
   optional .TSP.Reference database_data = 2;
   optional .TSP.Reference database_thumbnailData = 6;
   optional .TSP.Reference database_originalData = 8;
+  optional .TSP.Path traced_path = 19;
+  optional Attribution attribution = 20;
+  optional bool should_trace_pdf_content = 21;
+  optional bool background_removed = 22;
 }
 
 message MaskArchive {
-  required .TSD.DrawableArchive super = 1;
-  optional .TSD.PathSourceArchive pathsource = 2;
+  required DrawableArchive super = 1;
+  optional PathSourceArchive pathsource = 2;
+}
+
+message ImageDataAttributes {
+  optional .TSP.Size pixel_size = 1;
+  optional bool image_is_srgb = 2;
+  optional bool should_be_interpreted_as_generic_if_untagged = 3;
 }
 
 message MovieArchive {
-  required .TSD.DrawableArchive super = 1;
+  enum MovieLoopOption {
+    None = 0;
+    Repeat = 1;
+    BackAndForth = 2;
+  }
+
+  required DrawableArchive super = 1;
   optional .TSP.DataReference movieData = 14;
   optional .TSP.DataReference importedAuxiliaryMovieData = 22;
+  optional string imported_auxiliary_movie_data_original_filename = 25;
   optional string movieRemoteURL = 17;
   optional float startTime = 3;
   optional float endTime = 4;
   optional float posterTime = 5;
-  optional uint32 loopOption = 6;
+  optional uint32 loopOptionAsInteger = 6;
+  optional MovieArchive.MovieLoopOption loop_option = 24 [default = None];
   optional float volume = 7;
-  optional bool autoPlay = 8 [deprecated = true];
+  optional bool autoPlay = 8;
   optional bool audioOnly = 9;
   optional bool streaming = 18;
+  optional bool nativeAudioRecording = 27;
+  optional bool playsAcrossSlides = 28;
   optional .TSP.DataReference posterImageData = 15;
   optional .TSP.DataReference audioOnlyImageData = 16;
+  optional bool poster_image_generated_with_alpha_support = 23;
   optional uint32 playableState = 12;
   optional uint32 flags = 13;
   optional .TSP.Reference database_movieData = 2;
@@ -395,6 +455,9 @@ message MovieArchive {
   optional .TSP.Reference style = 19;
   optional .TSP.Size originalSize = 20;
   optional .TSP.Size naturalSize = 21;
+  optional Attribution attribution = 26;
+  optional MovieFingerprint fingerprint = 29;
+  optional bool is_live_video = 30 [default = false];
 }
 
 message ExteriorTextWrapArchive {
@@ -406,12 +469,55 @@ message ExteriorTextWrapArchive {
   optional bool is_html_wrap = 6;
 }
 
+message DrawableContentDescription {
+  optional uint32 element_kind = 1;
+  optional bool is_anchored_to_text = 2;
+  optional bool is_floating_above_text = 3;
+  optional bool is_inline_with_text = 4;
+}
+
+message FreehandDrawingContentDescription {
+  required DrawableContentDescription super = 1;
+  optional bool source_doc_wanted_spacer_shape = 2;
+}
+
+message FreehandDrawingToolkitUIState {
+  enum FreehandDrawingToolType {
+    Pen = 0;
+    Pencil = 1;
+    Crayon = 2;
+    Fill = 3;
+    Eraser = 4;
+    MarqueeSelect = 5;
+  }
+
+  optional .TSP.Color current_color = 1;
+  optional FreehandDrawingToolkitUIState.FreehandDrawingToolType most_recent_restorable_tool_type = 2 [default = Pen];
+  optional float pen_tool_opacity = 3;
+  optional float pen_tool_unscaled_width = 4;
+  optional float pencil_tool_opacity = 5;
+  optional float pencil_tool_unscaled_width = 6;
+  optional float crayon_tool_opacity = 7;
+  optional float crayon_tool_unscaled_width = 8;
+  optional float fill_tool_opacity = 9;
+  optional float eraser_tool_scaled_width = 10;
+  optional bool eraser_tool_erases_whole_objects = 11;
+  optional .TSP.Color pen_tool_color = 12;
+  optional .TSP.Color pencil_tool_color = 13;
+  optional .TSP.Color crayon_tool_color = 14;
+  optional .TSP.Color fill_tool_color = 15;
+}
+
+message StandinCaptionArchive {
+}
+
 message GuideArchive {
   enum GuideType {
     Horizontal = 0;
     Vertical = 1;
   }
-  optional .TSD.GuideArchive.GuideType type = 1;
+
+  optional GuideArchive.GuideType type = 1;
   optional float offset = 2;
   optional float start = 3;
   optional float end = 4;
@@ -424,22 +530,176 @@ message UserDefinedGuideArchive {
     Horizontal = 0;
     Vertical = 1;
   }
-  optional .TSD.UserDefinedGuideArchive.GuideType type = 1;
+
+  optional UserDefinedGuideArchive.GuideType type = 1;
   optional float position = 2;
 }
 
 message GuideStorageArchive {
-  repeated .TSD.UserDefinedGuideArchive userDefinedGuides = 1;
+  repeated UserDefinedGuideArchive userDefinedGuides = 1;
 }
 
 message CanvasSelectionArchive {
   repeated .TSP.Reference infos = 1;
+  repeated .TSP.Reference non_interactive_infos = 3;
   optional .TSP.Reference container = 2;
+}
+
+message DrawableSelectionArchive {
+  repeated .TSP.Reference infos = 2;
+  repeated .TSP.Reference non_interactive_infos = 3;
+}
+
+message GroupSelectionArchive {
+  required DrawableSelectionArchive super = 1;
+  optional bool has_selected_infos_in_non_group_container = 2;
+}
+
+message PathSelectionArchive {
+}
+
+message InfoHyperlinkSelectionArchive {
 }
 
 message CommentStorageArchive {
   optional string text = 1;
   optional .TSP.Date creation_date = 2;
   optional .TSP.Reference author = 3;
+  repeated .TSP.Reference replies = 4;
+  optional .TSP.UUID storage_uuid = 5;
+}
+
+message ReplaceAnnotationAuthorCommandArchive {
+  required .TSK.CommandArchive super = 1;
+  optional .TSP.Reference old_annotation_author = 2;
+  optional .TSP.Reference new_annotation_author = 3;
+}
+
+message PencilAnnotationArchive {
+  optional .TSP.Reference pencil_annotation_storage = 1;
+}
+
+message PencilAnnotationSelectionArchive {
+  optional .TSP.Reference pencil_annotation = 1;
+}
+
+message PencilAnnotationStorageArchive {
+  optional int32 attached_location = 1;
+  optional .TSP.Point markup_offset = 2;
+  optional .TSP.DataReference rasterized_image = 3;
+  optional .TSP.DataReference legacy_encoded_drawing = 4;
+  optional .TSP.Path drawing_path = 5;
+  optional .TSP.Point strokes_bounding_box_origin = 6;
+  optional .TSP.Size strokes_bounding_box_size = 7;
+  optional int32 attached_type = 8;
+  optional .TSP.Size original_attached_size = 9;
+  optional double percent_of_pa_contained_in_parent_rep = 10;
+  optional uint64 text_baselines_touched_count = 11;
+  optional uint64 visible_strokes_count = 12;
+  optional .TSP.Color pen_color = 13;
+  optional int32 tool_type = 14;
+  repeated .TSP.Reference callout_sub_storages = 15;
+  optional .TSP.Date creation_date = 16;
+  optional double pencil_annotation_drawing_scale = 17;
+  optional int32 compound_annotation_type = 18;
+  repeated .TSP.Reference sub_storages = 19;
+  optional .TSP.DataReference encoded_drawing = 20;
+  optional .TSP.Point stroke_points_frame_origin = 21;
+  optional .TSP.Size stroke_points_frame_size = 22;
+  optional .TSP.Point rendered_frame_origin = 23;
+  optional .TSP.Size rendered_frame_size = 24;
+}
+
+message SpecColorFillSetColorArchive {
+  required .TSP.Color color = 1;
+}
+
+message SpecFrameSetAssetScaleArchive {
+  required double asset_scale = 1;
+}
+
+message SpecGradientFillSetAngleArchive {
+  required double angle = 1;
+}
+
+message SpecImageFillSetTechniqueArchive {
+  required int32 technique = 1;
+}
+
+message SpecReflectionSetOpacityArchive {
+  required double opacity = 1;
+}
+
+message SpecShadowSetAngleArchive {
+  required double angle = 1;
+}
+
+message SpecShadowSetColorArchive {
+  required .TSP.Color color = 1;
+}
+
+message SpecShadowSetOffsetArchive {
+  required double offset = 1;
+}
+
+message SpecShadowSetOpacityArchive {
+  required double opacity = 1;
+}
+
+message SpecShadowSetRadiusArchive {
+  required int32 radius = 1;
+}
+
+message SpecStrokeSetColorArchive {
+  required .TSP.Color color = 1;
+}
+
+message SpecStrokeSetPatternArchive {
+  optional int32 line_cap = 1;
+  optional int32 line_join = 2;
+  optional double miter_limit = 3;
+  optional double width = 4;
+  optional .TSP.Color color = 5;
+  required StrokePatternArchive pattern = 6;
+}
+
+message SpecStrokeSetWidthArchive {
+  required double width = 1;
+}
+
+message Attribution {
+  optional string title = 1;
+  optional string description_text = 2;
+  optional string external_url = 3;
+  optional string author_name = 4;
+  optional string author_url = 5;
+}
+
+message MovieFingerprint {
+  repeated MovieFingerprintTrack tracks = 1;
+  repeated uint32 version = 2;
+}
+
+message MovieFingerprintTrack {
+  optional string media_type = 1;
+  optional bool enabled = 2;
+  optional int64 total_sample_data_length = 3;
+  optional string sample_data_digest_string = 4;
+  optional int64 time_range_start_value = 5;
+  optional int32 time_range_start_timescale = 6;
+  optional bool time_range_start_is_valid = 7;
+  optional int64 time_range_duration_value = 8;
+  optional int32 time_range_duration_timescale = 9;
+  optional bool time_range_duration_is_valid = 10;
+  optional .TSP.Size natural_size = 11;
+  optional double preferred_transform_a = 12;
+  optional double preferred_transform_b = 13;
+  optional double preferred_transform_c = 14;
+  optional double preferred_transform_d = 15;
+  optional double preferred_transform_tx = 16;
+  optional double preferred_transform_ty = 17;
+  optional double preferred_volume = 18;
+  optional string language_code = 19;
+  optional string extended_language_tag = 20;
 }
 

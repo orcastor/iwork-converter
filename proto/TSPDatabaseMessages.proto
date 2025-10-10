@@ -1,14 +1,17 @@
 syntax = "proto2";
 
-import "TSPMessages.proto";
 package TSP;
 
+option go_package = "github.com/orcastor/iwork-converter/proto/TSP";
+
+import "TSPMessages.proto";
+
 message DatabaseData {
-  required .TSP.DataReference data = 1;
+  required DataReference data = 1;
 }
 
 message DatabaseDataArchive {
-  optional .TSP.Reference data = 1;
+  optional Reference data = 1;
   optional string app_relative_path = 2;
   required string display_name = 3;
   optional uint64 length = 4;
@@ -22,7 +25,8 @@ message DatabaseImageDataArchive {
     bitmap = 1;
     pdf = 2;
   }
-  required .TSP.DatabaseDataArchive super = 1;
-  required .TSP.DatabaseImageDataArchive.ImageType type = 2;
+
+  required DatabaseDataArchive super = 1;
+  required DatabaseImageDataArchive.ImageType type = 2;
 }
 

@@ -132,8 +132,8 @@ func popcount(v uint16) int {
 func (ctx *Context) applyCellStyle(tm *TST.TableModelArchive, key uint32) string {
 	style := ""
 
-	if tm.DataStore != nil && tm.DataStore.StyleTable != nil {
-		styleTableRef := ctx.ix.Deref(tm.DataStore.StyleTable)
+	if tm.BaseDataStore != nil && tm.BaseDataStore.StyleTable != nil {
+		styleTableRef := ctx.ix.Deref(tm.BaseDataStore.StyleTable)
 		if tdl, ok := styleTableRef.(*TST.TableDataList); ok {
 			if debugTableCells {
 				fmt.Printf("DEBUG: Looking for style with key %d in StyleTable with %d entries\n", key, len(tdl.Entries))
@@ -318,9 +318,9 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
 		}
 
 		// Check data storage structure
-		if tm.DataStore != nil && tm.DataStore.Tiles != nil {
-			fmt.Printf("DEBUG: DataStore has %d tiles\n", len(tm.DataStore.Tiles.Tiles))
-			for i, tinfo := range tm.DataStore.Tiles.Tiles {
+		if tm.BaseDataStore != nil && tm.BaseDataStore.Tiles != nil {
+			fmt.Printf("DEBUG: DataStore has %d tiles\n", len(tm.BaseDataStore.Tiles.Tiles))
+			for i, tinfo := range tm.BaseDataStore.Tiles.Tiles {
 				tile := ctx.ix.Deref(tinfo.Tile).(*TST.Tile)
 				fmt.Printf("DEBUG: Tile %d has %d rows\n", i, len(tile.RowInfos))
 			}
@@ -329,15 +329,15 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
 	// Extract string and rich text tables
 	var stringTable []*TST.TableDataList_ListEntry
 	var richTable []*TST.TableDataList_ListEntry
-	if tm.DataStore != nil {
+	if tm.BaseDataStore != nil {
 		if debugTableCells {
 			fmt.Printf("DEBUG: DataStore found\n")
 		}
-		if tm.DataStore.StringTable != nil {
+		if tm.BaseDataStore.StringTable != nil {
 			if debugTableCells {
 				fmt.Printf("DEBUG: StringTable reference found\n")
 			}
-			if tdl, ok := ctx.ix.Deref(tm.DataStore.StringTable).(*TST.TableDataList); ok {
+			if tdl, ok := ctx.ix.Deref(tm.BaseDataStore.StringTable).(*TST.TableDataList); ok {
 				stringTable = tdl.Entries
 				if debugTableCells {
 					fmt.Printf("DEBUG: StringTable loaded with %d entries\n", len(stringTable))
@@ -357,14 +357,14 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
 				fmt.Printf("DEBUG: No StringTable reference\n")
 			}
 		}
-		if tm.DataStore.RichTextPayloadTable != nil {
+		if tm.BaseDataStore.RichTextTable != nil {
 			if debugTableCells {
-				fmt.Printf("DEBUG: RichTextPayloadTable reference found\n")
+				fmt.Printf("DEBUG: RichTextTable reference found\n")
 			}
-			if tdl, ok := ctx.ix.Deref(tm.DataStore.RichTextPayloadTable).(*TST.TableDataList); ok {
+			if tdl, ok := ctx.ix.Deref(tm.BaseDataStore.RichTextTable).(*TST.TableDataList); ok {
 				richTable = tdl.Entries
 				if debugTableCells {
-					fmt.Printf("DEBUG: RichTextPayloadTable loaded with %d entries\n", len(richTable))
+					fmt.Printf("DEBUG: RichTextTable loaded with %d entries\n", len(richTable))
 					for i, entry := range richTable {
 						fmt.Printf("DEBUG: RichTextTable[%d]: key=%d\n", i, *entry.Key)
 						if entry.RichTextPayload != nil {
@@ -392,12 +392,12 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
 				}
 			} else {
 				if debugTableCells {
-					fmt.Printf("DEBUG: Failed to deref RichTextPayloadTable\n")
+					fmt.Printf("DEBUG: Failed to deref RichTextTable\n")
 				}
 			}
 		} else {
 			if debugTableCells {
-				fmt.Printf("DEBUG: No RichTextPayloadTable reference\n")
+				fmt.Printf("DEBUG: No RichTextTable reference\n")
 			}
 		}
 	} else {
@@ -530,20 +530,20 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
 
 	// Build a map of tile ID to tile for quick lookup
 	tileMap := make(map[uint32]*TST.Tile)
-	for _, tinfo := range tm.DataStore.Tiles.Tiles {
+	for _, tinfo := range tm.BaseDataStore.Tiles.Tiles {
 		tile := ctx.ix.Deref(tinfo.Tile).(*TST.Tile)
 		tileMap[*tinfo.Tileid] = tile
 	}
 
 	// Use rowTileTree to get correct row order
-	if tm.DataStore.RowTileTree != nil {
+	if tm.BaseDataStore.RowTileTree != nil {
 		if debugTableCells {
-			fmt.Printf("DEBUG: RowTileTree has %d nodes\n", len(tm.DataStore.RowTileTree.Nodes))
-			for i, node := range tm.DataStore.RowTileTree.Nodes {
+			fmt.Printf("DEBUG: RowTileTree has %d nodes\n", len(tm.BaseDataStore.RowTileTree.Nodes))
+			for i, node := range tm.BaseDataStore.RowTileTree.Nodes {
 				fmt.Printf("DEBUG: RowTileTree[%d]: rowIndex=%d, tileId=%d\n", i, *node.Key, *node.Value)
 			}
 		}
-		for _, node := range tm.DataStore.RowTileTree.Nodes {
+		for _, node := range tm.BaseDataStore.RowTileTree.Nodes {
 			rowIndex := *node.Key
 			tileId := *node.Value
 			if tile, exists := tileMap[tileId]; exists {
@@ -568,7 +568,7 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
 
 	// If rowTileTree is not available or empty, fall back to original method
 	if len(orderedRows) == 0 {
-		for _, tinfo := range tm.DataStore.Tiles.Tiles {
+		for _, tinfo := range tm.BaseDataStore.Tiles.Tiles {
 			tile := ctx.ix.Deref(tinfo.Tile).(*TST.Tile)
 			for _, rinfo := range tile.RowInfos {
 				orderedRows = append(orderedRows, struct {
@@ -581,7 +581,7 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
 	} else {
 		// Check if rowTileTree contains all rows, if not, supplement with remaining rows
 		expectedRows := 0
-		for _, tinfo := range tm.DataStore.Tiles.Tiles {
+		for _, tinfo := range tm.BaseDataStore.Tiles.Tiles {
 			tile := ctx.ix.Deref(tinfo.Tile).(*TST.Tile)
 			expectedRows += len(tile.RowInfos)
 		}
@@ -600,7 +600,7 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
 			}
 
 			// Add remaining rows
-			for _, tinfo := range tm.DataStore.Tiles.Tiles {
+			for _, tinfo := range tm.BaseDataStore.Tiles.Tiles {
 				tile := ctx.ix.Deref(tinfo.Tile).(*TST.Tile)
 				for _, rinfo := range tile.RowInfos {
 					if rinfo.TileRowIndex != nil && !processedRows[*rinfo.TileRowIndex] {
@@ -1016,8 +1016,8 @@ func (ctx *Context) processDrawable(ref *TSP.Reference) *html.Node {
 		}
 		// Pages text boxes sometimes provide fill/stroke through paragraph styles
 		if fillCSS == "" || strokeCSS == "" {
-			if sia.ContainedStorage != nil {
-				if stor, ok := ctx.ix.Deref(sia.ContainedStorage).(*TSWP.StorageArchive); ok && stor.TableParaStyle != nil && len(stor.TableParaStyle.Entries) > 0 {
+			if sia.OwnedStorage != nil {
+				if stor, ok := ctx.ix.Deref(sia.OwnedStorage).(*TSWP.StorageArchive); ok && stor.TableParaStyle != nil && len(stor.TableParaStyle.Entries) > 0 {
 					if stor.TableParaStyle.Entries[0].Object != nil {
 						if psa, ok := ctx.ix.Deref(stor.TableParaStyle.Entries[0].Object).(*TSWP.ParagraphStyleArchive); ok && psa.ParaProperties != nil {
 							if fillCSS == "" && psa.ParaProperties.Fill != nil {
@@ -1087,7 +1087,7 @@ func (ctx *Context) processDrawable(ref *TSP.Reference) *html.Node {
 
 func (ctx *Context) processShapeInfo(sia *TSWP.ShapeInfoArchive) *html.Node {
 	fmt.Printf("DEBUG: Processing ShapeInfo\n")
-	containedStorageRef := ctx.ix.Deref(sia.ContainedStorage)
+	containedStorageRef := ctx.ix.Deref(sia.OwnedStorage)
 	if cs, ok := containedStorageRef.(*TSWP.StorageArchive); ok {
 		fmt.Printf("DEBUG: Found ContainedStorage with text: %s\n", cs.Text)
 		div := E("div")
@@ -2553,12 +2553,12 @@ func (ctx *Context) processPages() *html.Node {
 			"        \n" +
 			"        \n" +
 			"        if (remainingRows.length > 0) {\n" +
-			"          console.log('还有', remainingRows.length, '行需要处理，创建新页面');\n" +
+			"          console.log('Still', remainingRows.length, 'rows to process, creating new page');\n" +
 			"          currentPage = newPage();\n" +
 			"        }\n" +
 			"      }\n" +
 			"      \n" +
-			"      console.log('表格智能分页处理完成，总页面数:', pages.length);\n" +
+			"      console.log('Table smart pagination completed, total pages:', pages.length);\n" +
 			"    } else {\n" +
 			"      \n" +
 			"      if (node.dataset && node.dataset.flowText === '1') {\n" +
@@ -2604,11 +2604,11 @@ func (ctx *Context) processPages() *html.Node {
 			"p { margin: 0; line-height: 1.2; }\n" +
 			".page table { width: 100%; margin: 0; border-collapse: collapse; }\n" +
 			".page td, .page th { padding: 0; vertical-align: top; border: none; }\n" +
-			"/* 表格分页优化样式 */\n" +
+			"/* Table pagination optimization styles */\n" +
 			".page table.table-paginated { page-break-inside: auto; }\n" +
 			".page table.table-paginated thead { display: table-header-group; }\n" +
 			".page table.table-paginated tbody { display: table-row-group; }\n" +
-			"/* 表格分页指示器 */\n" +
+			"/* Table pagination indicator */\n" +
 			".page .table-page-indicator { \n" +
 			"  font-size: 0.8em; color: #666; text-align: center; \n" +
 			"  margin: 0.5em 0; padding: 0.25em; \n" +
@@ -2658,20 +2658,54 @@ func (ctx *Context) processNumbers() *html.Node {
 
 // processKeynote translates a keynote file.
 func (ctx *Context) processKeynote() *html.Node {
+	fmt.Printf("DEBUG: processKeynote called with %d records\n", len(ctx.ix.Records))
+
 	// Root of output document
 	head, body := E("head", "\n", E("meta", []string{"charset", "utf-8"}), "\n"), E("body", "\n")
 	doc := E("", E("html"), "\n", E("html", head, "\n", body))
 	doc.Type = html.DocumentNode
 	doc.FirstChild.Type = html.DoctypeNode
 
-	meta := ctx.ix.Records[2].(*TSP.PackageMetadata)
-	ids := []uint64{}
-	for _, comp := range meta.Components {
-		if *comp.PreferredLocator == "Slide" {
-			ids = append(ids, *comp.Identifier)
+	// First try to use SlideTree.Slides order
+	var slideTreeSlides []*TSP.Reference
+	for _, rec := range ctx.ix.Records {
+		if sh, ok := rec.(*KN.ShowArchive); ok {
+			if sh.SlideTree != nil && sh.SlideTree.Slides != nil {
+				slideTreeSlides = sh.SlideTree.Slides
+				break
+			}
 		}
 	}
-	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
+
+	ids := []uint64{}
+	if slideTreeSlides != nil {
+		// Use SlideTree.Slides order and check IsSkipped field
+		fmt.Printf("DEBUG: Using SlideTree.Slides order with %d slides\n", len(slideTreeSlides))
+		for _, slideRef := range slideTreeSlides {
+			if slideRef != nil && slideRef.Identifier != nil {
+				slideNodeId := *slideRef.Identifier
+				if slideNode, ok := ctx.ix.Records[slideNodeId].(*KN.SlideNodeArchive); ok {
+					// Check if slide is skipped
+					if slideNode.Slide != nil && slideNode.Slide.Identifier != nil {
+						actualSlideId := *slideNode.Slide.Identifier
+						ids = append(ids, actualSlideId)
+						fmt.Printf("DEBUG: Added slide %d to display list\n", actualSlideId)
+					}
+				}
+			}
+		}
+	} else {
+		// Fallback to original method
+		fmt.Printf("DEBUG: Using fallback method\n")
+		for key, rec := range ctx.ix.Records {
+			if _, ok := rec.(*KN.SlideArchive); ok {
+				ids = append(ids, key)
+				fmt.Printf("DEBUG: Found slide at record %d\n", key)
+			}
+		}
+		sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
+	}
+	fmt.Printf("DEBUG: Final slide count for display: %d\n", len(ids))
 
 	// Read canvas size to set slide aspect ratio precisely
 	canvasW := 1920.0
@@ -2681,6 +2715,7 @@ func (ctx *Context) processKeynote() *html.Node {
 			if sh.Size != nil && sh.Size.Width != nil && sh.Size.Height != nil {
 				canvasW = float64(*sh.Size.Width)
 				canvasH = float64(*sh.Size.Height)
+				fmt.Printf("DEBUG: Canvas size: %.0f x %.0f\n", canvasW, canvasH)
 			}
 			break
 		}
@@ -2690,7 +2725,7 @@ func (ctx *Context) processKeynote() *html.Node {
 	for _, id := range ids {
 		slide := ctx.ix.Records[id].(*KN.SlideArchive)
 		div := E("div", []string{"class", "slide", "style", fmt.Sprintf("aspect-ratio: %.0f / %.0f;", canvasW, canvasH)})
-		for _, d := range append([]*TSP.Reference{slide.BodyPlaceholder}, slide.Drawables...) {
+		for _, d := range append([]*TSP.Reference{slide.BodyPlaceholder}, slide.OwnedDrawables...) {
 			if d == nil {
 				continue
 			}
@@ -2758,7 +2793,7 @@ func translateCharProps(props *TSWP.CharacterStylePropertiesArchive) string {
 	}
 	if props.FontSize != nil {
 		fs := float64(*props.FontSize)
-		// 直接使用原始字体大小，不进行缩放
+		// Use original font size directly without scaling
 		rval += fmt.Sprintf("font-size: %.2fpt;", fs)
 	}
 	if props.FontName != nil {
@@ -2828,7 +2863,7 @@ func translateParaProps(ix *index.Index, props *TSWP.ParagraphStylePropertiesArc
 		rval += fmt.Sprintf("  margin-bottom: %fpt;\n", *props.SpaceAfter)
 	}
 
-	// Paragraph background fill -> 已禁用背景色
+	// Paragraph background fill -> background color disabled
 	// if props.Fill != nil {
 	//	if css := colorToCSS(props.Fill); css != "" {
 	//		if strings.HasPrefix(css, "rgba(") || strings.HasPrefix(css, "rgb(") || strings.HasPrefix(css, "#") {
@@ -2839,10 +2874,10 @@ func translateParaProps(ix *index.Index, props *TSWP.ParagraphStylePropertiesArc
 	//	}
 	// }
 
-	// List style processing - 重新启用简单的列表样式处理
+	// List style processing - re-enable simple list style processing
 	if props.ListStyleNull == nil || !*props.ListStyleNull {
 		if props.ListStyle != nil {
-			// 处理列表样式
+			// Process list styles
 			listCSS := translateListStyle(ix, props.ListStyle)
 			if listCSS != "" {
 				rval += listCSS
@@ -2877,44 +2912,44 @@ func ptype(x interface{}) {
 	fmt.Printf("type %T\n", x)
 }
 
-// translateListStyle 处理列表样式，返回 CSS 样式
+// translateListStyle processes list styles and returns CSS styles
 func translateListStyle(ix *index.Index, listStyleRef *TSP.Reference) string {
 	if listStyleRef == nil {
 		return ""
 	}
 
-	// 从引用中获取 ListStyleArchive
+	// Get ListStyleArchive from reference
 	ls, ok := ix.Deref(listStyleRef).(*TSWP.ListStyleArchive)
 	if !ok {
-		fmt.Printf("*** 列表样式不是 ListStyleArchive 类型: %T\n", ix.Deref(listStyleRef))
+		fmt.Printf("*** List style is not ListStyleArchive type: %T\n", ix.Deref(listStyleRef))
 		return ""
 	}
 
 	rval := ""
 
-	// 改进的列表样式处理
+	// Improved list style processing
 	if len(ls.LabelTypes) > 0 {
 		labelType := ls.LabelTypes[0]
 		switch labelType {
 		case TSWP.ListStyleArchive_kNumber:
-			// 数字列表
+			// Numbered list
 			rval += "list-style-type: decimal;"
 		case TSWP.ListStyleArchive_kString:
-			// 字符串列表
+			// String list
 			rval += "list-style-type: disc;"
 		case TSWP.ListStyleArchive_kImage:
-			// 图片列表
+			// Image list
 			rval += "list-style-type: disc;"
 		default:
-			// 默认使用 disc
+			// Default to disc
 			rval += "list-style-type: disc;"
 		}
 	} else {
-		// 默认使用 disc
+		// Default to disc
 		rval += "list-style-type: disc;"
 	}
 
-	// 处理缩进
+	// Process indentation
 	if len(ls.Indents) > 0 {
 		indent := ls.Indents[0]
 		if rval != "" {
@@ -2923,7 +2958,7 @@ func translateListStyle(ix *index.Index, listStyleRef *TSP.Reference) string {
 		rval += fmt.Sprintf("margin-left: %fpt;", indent)
 	}
 
-	// 添加基本的列表样式
+	// Add basic list styles
 	if rval != "" {
 		rval += " "
 	}
@@ -2932,15 +2967,15 @@ func translateListStyle(ix *index.Index, listStyleRef *TSP.Reference) string {
 	return rval
 }
 
-// processCellBorders 处理单元格边框和圆角样式
+// processCellBorders processes cell borders and rounded corner styles
 func processCellBorders(style *string, props *TST.CellStylePropertiesArchive) {
-	// 处理四边边框
+	// Process four-side borders
 	processCellStroke(style, "border-top", props.TopStroke)
 	processCellStroke(style, "border-right", props.RightStroke)
 	processCellStroke(style, "border-bottom", props.BottomStroke)
 	processCellStroke(style, "border-left", props.LeftStroke)
 
-	// 检查是否有圆角（通过检查边框的 Join 属性）
+	// Check for rounded corners (by checking border Join property)
 	hasRoundJoin := false
 	if props.TopStroke != nil && props.TopStroke.Join != nil && *props.TopStroke.Join == TSD.LineJoin_RoundJoin {
 		hasRoundJoin = true
@@ -2960,7 +2995,7 @@ func processCellBorders(style *string, props *TST.CellStylePropertiesArchive) {
 	}
 }
 
-// processCellStroke 处理单个边框
+// processCellStroke processes a single border
 func processCellStroke(style *string, borderProp string, stroke *TSD.StrokeArchive) {
 	if stroke != nil && stroke.Color != nil {
 		col := colorToCSS(stroke.Color)
@@ -2974,36 +3009,36 @@ func processCellStroke(style *string, borderProp string, stroke *TSD.StrokeArchi
 	}
 }
 
-// processCellFont 处理单元格字体样式
+// processCellFont processes cell font styles
 func processCellFont(style *string, props *TST.CellStylePropertiesArchive) {
-	// 处理单元格字体样式
+	// Process cell font styles
 	if props == nil {
 		return
 	}
 
-	// CellStylePropertiesArchive 主要处理单元格的布局和边框
-	// 字体样式通过字符样式处理，这里只处理单元格级别的字体设置
+	// CellStylePropertiesArchive mainly handles cell layout and borders
+	// Font styles are handled through character styles, here we only handle cell-level font settings
 
-	// 处理文本换行
+	// Process text wrapping
 	if props.TextWrap != nil && *props.TextWrap {
 		*style += "white-space: normal;"
 	} else {
 		*style += "white-space: nowrap;"
 	}
 
-	// 处理垂直对齐
+	// Process vertical alignment
 	if props.VerticalAlignment != nil {
 		switch *props.VerticalAlignment {
-		case 0: // 顶部对齐
+		case 0: // Top alignment
 			*style += "vertical-align: top;"
-		case 1: // 中间对齐
+		case 1: // Middle alignment
 			*style += "vertical-align: middle;"
-		case 2: // 底部对齐
+		case 2: // Bottom alignment
 			*style += "vertical-align: bottom;"
 		}
 	}
 
-	// 处理内边距
+	// Process padding
 	if props.Padding != nil {
 		if props.Padding.Top != nil {
 			*style += fmt.Sprintf("padding-top: %.2fpt;", float64(*props.Padding.Top))
@@ -3020,33 +3055,33 @@ func processCellFont(style *string, props *TST.CellStylePropertiesArchive) {
 	}
 }
 
-// detectEmptyColumns 检测哪些列是空的（没有任何内容）
+// detectEmptyColumns detects which columns are empty (have no content)
 func (ctx *Context) detectEmptyColumns(tm *TST.TableModelArchive, stringTable []*TST.TableDataList_ListEntry, richTable []*TST.TableDataList_ListEntry) []bool {
 	cc := int(*tm.NumberOfColumns)
 	emptyColumns := make([]bool, cc)
 
-	// 初始化所有列为空
+	// Initialize all columns as empty
 	for i := 0; i < cc; i++ {
 		emptyColumns[i] = true
 	}
 
-	// 遍历所有tile和行来检查每列是否有内容
-	if tm.DataStore != nil && tm.DataStore.Tiles != nil {
-		for _, tinfo := range tm.DataStore.Tiles.Tiles {
+	// Iterate through all tiles and rows to check if each column has content
+	if tm.BaseDataStore != nil && tm.BaseDataStore.Tiles != nil {
+		for _, tinfo := range tm.BaseDataStore.Tiles.Tiles {
 			tile := ctx.ix.Deref(tinfo.Tile).(*TST.Tile)
 			for _, rinfo := range tile.RowInfos {
-				// 解码该行的 column -> offset 映射
+				// Decode the column -> offset mapping for this row
 				offsets := make([]uint16, len(rinfo.CellOffsets)/2)
 				binary.Read(bytes.NewBuffer(rinfo.CellOffsets), LE, offsets)
 
-				// 检查每一列
+				// Check each column
 				for c := 0; c < cc && c < len(offsets); c++ {
 					offset := offsets[c]
 					if debugTableCells {
 						fmt.Printf("DEBUG: Checking column %d, offset=%d\n", c, offset)
 					}
-					if offset != 65535 { // 不是空单元格
-						// 检查这个单元格是否有实际内容
+					if offset != 65535 { // Not an empty cell
+						// Check if this cell has actual content
 						hasContent := ctx.hasCellContent(rinfo, offset, stringTable, richTable)
 						if debugTableCells {
 							fmt.Printf("DEBUG: Column %d has content: %v\n", c, hasContent)
@@ -3077,20 +3112,20 @@ func (ctx *Context) detectEmptyColumns(tm *TST.TableModelArchive, stringTable []
 	return emptyColumns
 }
 
-// hasCellContent 检查指定单元格是否有实际内容
+// hasCellContent checks if the specified cell has actual content
 func (ctx *Context) hasCellContent(rinfo *TST.TileRowInfo, offset uint16, stringTable []*TST.TableDataList_ListEntry, richTable []*TST.TableDataList_ListEntry) bool {
-	// 尝试从buffer中读取键值
+	// Try to read key value from buffer
 	if len(rinfo.CellStorageBuffer) > int(offset)+8 {
 		possibleKey := LE.Uint32(rinfo.CellStorageBuffer[offset+4 : offset+8])
 
-		// 检查richTable
+		// Check richTable
 		if len(richTable) > 0 {
 			for _, entry := range richTable {
 				if *entry.Key == possibleKey {
-					// 检查rich text是否有实际内容
+					// Check if rich text has actual content
 					if rt, ok := ctx.ix.Deref(entry.RichTextPayload).(*TST.RichTextPayloadArchive); ok {
 						if st, ok := ctx.ix.Deref(rt.Storage).(*TSWP.StorageArchive); ok && st != nil {
-							// 检查storage是否有文本内容
+							// Check if storage has text content
 							return ctx.hasStorageContent(st)
 						}
 					}
@@ -3099,32 +3134,32 @@ func (ctx *Context) hasCellContent(rinfo *TST.TileRowInfo, offset uint16, string
 			}
 		}
 
-		// 检查stringTable
+		// Check stringTable
 		if len(stringTable) > 0 {
 			for _, entry := range stringTable {
 				if *entry.Key == possibleKey {
-					// 检查字符串是否非空
+					// Check if string is not empty
 					return entry.String_ != nil && len(strings.TrimSpace(*entry.String_)) > 0
 				}
 			}
 		}
 	}
 
-	// 如果从buffer中没找到匹配的键值，说明这个单元格没有实际内容
-	// 因为如果真的有内容，应该能在stringTable或richTable中找到对应的键值
+	// If no matching key value is found in buffer, this cell has no actual content
+	// Because if there really is content, it should be found in stringTable or richTable with corresponding key value
 	if debugTableCells {
 		fmt.Printf("DEBUG: No matching key found in tables, treating as empty\n")
 	}
 	return false
 }
 
-// hasStorageContent 检查storage是否有实际的文本内容
+// hasStorageContent checks if storage has actual text content
 func (ctx *Context) hasStorageContent(st *TSWP.StorageArchive) bool {
 	if st == nil {
 		return false
 	}
 
-	// 检查是否有文本内容
+	// Check if there is text content
 	if st.Text != nil && len(st.Text) > 0 {
 		for _, text := range st.Text {
 			if len(strings.TrimSpace(text)) > 0 {
@@ -3136,11 +3171,11 @@ func (ctx *Context) hasStorageContent(st *TSWP.StorageArchive) bool {
 	return false
 }
 
-// calculateColumnWidths 根据空列信息计算列宽
+// calculateColumnWidths calculates column widths based on empty column information
 func (ctx *Context) calculateColumnWidths(totalColumns int, emptyColumns []bool) []float64 {
 	widths := make([]float64, totalColumns)
 
-	// 计算非空列的数量
+	// Calculate the number of non-empty columns
 	nonEmptyCount := 0
 	for _, empty := range emptyColumns {
 		if !empty {
@@ -3152,7 +3187,7 @@ func (ctx *Context) calculateColumnWidths(totalColumns int, emptyColumns []bool)
 		fmt.Printf("DEBUG: Total columns: %d, Non-empty columns: %d\n", totalColumns, nonEmptyCount)
 	}
 
-	// 如果所有列都是空的，第一列占用100%
+	// If all columns are empty, first column takes 100%
 	if nonEmptyCount == 0 {
 		widths[0] = 100.0
 		for i := 1; i < totalColumns; i++ {
@@ -3162,7 +3197,7 @@ func (ctx *Context) calculateColumnWidths(totalColumns int, emptyColumns []bool)
 			fmt.Printf("DEBUG: All columns empty, first column gets 100%%\n")
 		}
 	} else {
-		// 非空列平均分配宽度，空列宽度为0
+		// Non-empty columns share width equally, empty columns have 0 width
 		widthPerNonEmpty := 100.0 / float64(nonEmptyCount)
 		for i := 0; i < totalColumns; i++ {
 			if emptyColumns[i] {
@@ -3179,9 +3214,9 @@ func (ctx *Context) calculateColumnWidths(totalColumns int, emptyColumns []bool)
 	return widths
 }
 
-// rearrangeContentToNonEmptyColumns 重新排列内容，将所有内容填充到非空列中
+// rearrangeContentToNonEmptyColumns rearranges content to fill all content into non-empty columns
 func (ctx *Context) rearrangeContentToNonEmptyColumns(offsets []uint16, emptyColumns []bool, currentRow int) []uint16 {
-	// 计算非空列的数量
+	// Calculate the number of non-empty columns
 	nonEmptyCount := 0
 	for _, empty := range emptyColumns {
 		if !empty {
@@ -3189,10 +3224,10 @@ func (ctx *Context) rearrangeContentToNonEmptyColumns(offsets []uint16, emptyCol
 		}
 	}
 
-	// 创建新的offsets数组
+	// Create new offsets array
 	newOffsets := make([]uint16, len(offsets))
 
-	// 收集所有有内容的offset（不管是否在空列中）
+	// Collect all content offsets (regardless of whether they are in empty columns)
 	contentOffsets := make([]uint16, 0)
 	for _, offset := range offsets {
 		if offset != 65535 {
@@ -3204,24 +3239,24 @@ func (ctx *Context) rearrangeContentToNonEmptyColumns(offsets []uint16, emptyCol
 		fmt.Printf("DEBUG: Row %d - Found %d content offsets: %v\n", currentRow, len(contentOffsets), contentOffsets)
 	}
 
-	// 如果所有列都是空的，将所有内容填充到第一列
+	// If all columns are empty, fill all content into the first column
 	if nonEmptyCount == 0 {
 		if len(contentOffsets) > 0 {
-			// 将所有内容都放在第一列，其他列保持为空
+			// Put all content in the first column, keep other columns empty
 			newOffsets[0] = contentOffsets[0]
 			for i := 1; i < len(newOffsets); i++ {
-				newOffsets[i] = 65535 // 空单元格
+				newOffsets[i] = 65535 // Empty cell
 			}
 		}
 	} else {
-		// 如果有非空列，将内容填充到非空列中
+		// If there are non-empty columns, fill content into non-empty columns
 		contentIndex := 0
 		for i := 0; i < len(newOffsets); i++ {
 			if i < len(emptyColumns) && !emptyColumns[i] && contentIndex < len(contentOffsets) {
 				newOffsets[i] = contentOffsets[contentIndex]
 				contentIndex++
 			} else {
-				newOffsets[i] = 65535 // 空单元格
+				newOffsets[i] = 65535 // Empty cell
 			}
 		}
 	}
@@ -3233,20 +3268,20 @@ func (ctx *Context) rearrangeContentToNonEmptyColumns(offsets []uint16, emptyCol
 	return newOffsets
 }
 
-// collectAllContentOffsets 收集所有行的所有列的内容偏移，用于重新排列
+// collectAllContentOffsets collects content offsets for all columns of all rows for rearrangement
 func (ctx *Context) collectAllContentOffsets(tm *TST.TableModelArchive) [][]uint16 {
 	var allContentOffsets []uint16
 
-	// 首先收集所有有内容的offset
-	if tm.DataStore != nil && tm.DataStore.Tiles != nil {
-		for _, tinfo := range tm.DataStore.Tiles.Tiles {
+	// First collect all content offsets
+	if tm.BaseDataStore != nil && tm.BaseDataStore.Tiles != nil {
+		for _, tinfo := range tm.BaseDataStore.Tiles.Tiles {
 			tile := ctx.ix.Deref(tinfo.Tile).(*TST.Tile)
 			for _, rinfo := range tile.RowInfos {
-				// 解码该行的 column -> offset 映射
+				// Decode the column -> offset mapping for this row
 				offsets := make([]uint16, len(rinfo.CellOffsets)/2)
 				binary.Read(bytes.NewBuffer(rinfo.CellOffsets), LE, offsets)
 
-				// 收集所有非空的offset，但要检查是否在buffer范围内
+				// Collect all non-empty offsets, but check if they are within buffer range
 				for _, offset := range offsets {
 					if offset != 65535 && int(offset) < len(rinfo.CellStorageBuffer) {
 						allContentOffsets = append(allContentOffsets, offset)
@@ -3260,26 +3295,26 @@ func (ctx *Context) collectAllContentOffsets(tm *TST.TableModelArchive) [][]uint
 		fmt.Printf("DEBUG: Collected %d content offsets: %v\n", len(allContentOffsets), allContentOffsets)
 	}
 
-	// 计算总行数
+	// Calculate total number of rows
 	totalRows := 0
-	if tm.DataStore != nil && tm.DataStore.Tiles != nil {
-		for _, tinfo := range tm.DataStore.Tiles.Tiles {
+	if tm.BaseDataStore != nil && tm.BaseDataStore.Tiles != nil {
+		for _, tinfo := range tm.BaseDataStore.Tiles.Tiles {
 			tile := ctx.ix.Deref(tinfo.Tile).(*TST.Tile)
 			totalRows += len(tile.RowInfos)
 		}
 	}
 
-	// 计算列数
+	// Calculate number of columns
 	cc := int(*tm.NumberOfColumns)
 
-	// 重新排列内容：将所有内容按顺序填充到第一列
+	// Rearrange content: fill all content sequentially into the first column
 	var rearrangedOffsets [][]uint16
 	contentIndex := 0
 
 	for row := 0; row < totalRows; row++ {
 		rowOffsets := make([]uint16, cc)
 
-		// 第一列填充内容，其他列保持为空
+		// Fill content in first column, keep other columns empty
 		if contentIndex < len(allContentOffsets) {
 			rowOffsets[0] = allContentOffsets[contentIndex]
 			contentIndex++
@@ -3287,7 +3322,7 @@ func (ctx *Context) collectAllContentOffsets(tm *TST.TableModelArchive) [][]uint
 			rowOffsets[0] = 65535
 		}
 
-		// 其他列保持为空
+		// Keep other columns empty
 		for c := 1; c < cc; c++ {
 			rowOffsets[c] = 65535
 		}

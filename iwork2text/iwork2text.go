@@ -76,8 +76,8 @@ func popcount(v uint16) int {
 func (ctx *Context) processTable(tm *TST.TableModelArchive, ocr func(io.Reader) (string, error)) string {
 	var doc string
 
-	stringTable := ctx.ix.Deref(tm.DataStore.StringTable).(*TST.TableDataList).Entries
-	richTable := ctx.ix.Deref(tm.DataStore.RichTextPayloadTable).(*TST.TableDataList).Entries
+	stringTable := ctx.ix.Deref(tm.BaseDataStore.StringTable).(*TST.TableDataList).Entries
+	richTable := ctx.ix.Deref(tm.BaseDataStore.RichTextTable).(*TST.TableDataList).Entries
 
 	// rc := *tm.NumberOfRows
 	cc := *tm.NumberOfColumns
@@ -88,7 +88,7 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive, ocr func(io.Reader) 
 	// so for now we assume at most one tile per row, and rows are in the right order.  I suspect long rows (more than
 	// 255 columns) will have multiple tiles, however.  This would likely only happen in a spreadsheet.
 
-	for _, tinfo := range tm.DataStore.Tiles.Tiles {
+	for _, tinfo := range tm.BaseDataStore.Tiles.Tiles {
 		tile := ctx.ix.Deref(tinfo.Tile).(*TST.Tile)
 		for r, rinfo := range tile.RowInfos {
 			offsets := make([]uint16, len(rinfo.CellOffsets)/2)
@@ -198,7 +198,7 @@ func (ctx *Context) processDrawable(ref *TSP.Reference, ocr func(io.Reader) (str
 }
 
 func (ctx *Context) processShapeInfo(sia *TSWP.ShapeInfoArchive, ocr func(io.Reader) (string, error)) string {
-	if cs := ctx.ix.Deref(sia.ContainedStorage).(*TSWP.StorageArchive); cs != nil {
+	if cs := ctx.ix.Deref(sia.OwnedStorage).(*TSWP.StorageArchive); cs != nil {
 		if doc, err := ctx.storageToNode(cs, ocr); err == nil {
 			return doc
 		}
@@ -397,9 +397,31 @@ func (ctx *Context) processKeynote(ocr func(io.Reader) (string, error)) string {
 	}
 	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
 
+	// Debug: Check for ShowArchive and SlideTree
+	for _, rec := range ctx.ix.Records {
+		if sh, ok := rec.(*KN.ShowArchive); ok {
+			fmt.Printf("DEBUG: Found ShowArchive\n")
+			if sh.SlideTree != nil {
+				fmt.Printf("DEBUG: SlideTree found!\n")
+				if sh.SlideTree.RootSlideNode != nil {
+					fmt.Printf("DEBUG: RootSlideNode: %v\n", sh.SlideTree.RootSlideNode)
+				}
+				if sh.SlideTree.Slides != nil {
+					fmt.Printf("DEBUG: Slides count: %d\n", len(sh.SlideTree.Slides))
+					for i, slide := range sh.SlideTree.Slides {
+						fmt.Printf("DEBUG: Slide[%d]: %v\n", i, slide)
+					}
+				}
+			} else {
+				fmt.Printf("DEBUG: SlideTree is nil\n")
+			}
+			break
+		}
+	}
+
 	for _, id := range ids {
 		slide := ctx.ix.Records[id].(*KN.SlideArchive)
-		for _, d := range append([]*TSP.Reference{slide.BodyPlaceholder}, slide.Drawables...) {
+		for _, d := range append([]*TSP.Reference{slide.BodyPlaceholder}, slide.OwnedDrawables...) {
 			if d == nil {
 				continue
 			}

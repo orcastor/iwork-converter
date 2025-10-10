@@ -1,13 +1,15 @@
 syntax = "proto2";
 
+package TSWP;
+option go_package = "github.com/orcastor/iwork-converter/proto/TSWP";
 import "TSPMessages.proto";
 import "TSSArchives.proto";
 import "TSDArchives.proto";
 import "TSKArchives.proto";
-package TSWP;
+import "TSCKArchives.proto";
 
 enum SelectionType {
-  SelectionType_Normal = 0;
+  SelectionType_Normal_DEPRECATED = 0;
   SelectionType_ListLabel = 1;
   SelectionType_ListTopic = 2;
   SelectionType_Replace = 3;
@@ -15,6 +17,7 @@ enum SelectionType {
   SelectionType_Replace2 = 5;
   SelectionType_SmartField = 6;
   SelectionType_Visual = 7;
+  SelectionType_Logical = 8;
 }
 
 enum StyleInsertionBehavior {
@@ -35,11 +38,15 @@ enum WritingDirectionType {
 }
 
 message SelectionArchive {
-  required .TSWP.SelectionType type = 1;
-  required .TSP.Range range = 2;
-  required .TSWP.StyleInsertionBehavior styleInsertionBehavior = 3;
-  required .TSWP.CaretAffinity caretAffinity = 4;
+  required SelectionType deprecated_type = 1;
+  required .TSP.Range visual_definition_range = 2;
+  required StyleInsertionBehavior styleInsertionBehavior = 3;
+  required CaretAffinity caretAffinity = 4;
   required .TSP.Range smart_field_range = 5;
+  optional bool leading_edge = 6;
+  optional uint32 leading_char_index = 7;
+  optional SelectionType type = 8;
+  repeated .TSP.Range ranges = 9;
 }
 
 message ObjectAttributeTable {
@@ -47,7 +54,8 @@ message ObjectAttributeTable {
     required uint32 character_index = 1;
     optional .TSP.Reference object = 2;
   }
-  repeated .TSWP.ObjectAttributeTable.ObjectAttribute entries = 1;
+
+  repeated ObjectAttributeTable.ObjectAttribute entries = 1;
 }
 
 message StringAttributeTable {
@@ -55,7 +63,8 @@ message StringAttributeTable {
     required uint32 character_index = 1;
     optional string object = 2;
   }
-  repeated .TSWP.StringAttributeTable.StringAttribute entries = 1;
+
+  repeated StringAttributeTable.StringAttribute entries = 1;
 }
 
 message ParaDataAttributeTable {
@@ -64,17 +73,17 @@ message ParaDataAttributeTable {
     required uint32 first = 2;
     required uint32 second = 3;
   }
-  repeated .TSWP.ParaDataAttributeTable.ParaDataAttribute entries = 1;
+
+  repeated ParaDataAttributeTable.ParaDataAttribute entries = 1;
 }
 
-message SparseObjectAttributeTable {
-  message SparseObjectAttribute {
-    required uint32 character_index = 1;
-    optional .TSP.Reference object = 2;
-    required uint32 run_length = 3;
+message OverlappingFieldAttributeTable {
+  message OverlappingFieldAttribute {
+    required .TSP.Range range = 1;
+    required .TSP.Reference field = 2;
   }
-  required uint32 total_count = 1;
-  repeated .TSWP.SparseObjectAttributeTable.SparseObjectAttribute entries = 2;
+
+  repeated OverlappingFieldAttributeTable.OverlappingFieldAttribute entries = 1;
 }
 
 message StorageArchive {
@@ -87,34 +96,46 @@ message StorageArchive {
     CELL = 5;
     UNCLASSIFIED = 6;
     TABLEOFCONTENTS = 7;
+    UNDEFINED = 8;
   }
-  optional .TSWP.StorageArchive.KindType kind = 1 [default = TEXTBOX];
+
+  optional StorageArchive.KindType kind = 1 [default = TEXTBOX];
   optional .TSP.Reference style_sheet = 2;
   repeated string text = 3;
   optional bool has_itext = 4 [default = false];
   optional bool in_document = 10 [default = false];
-  optional .TSWP.ObjectAttributeTable table_para_style = 5;
-  optional .TSWP.ParaDataAttributeTable table_para_data = 6;
-  optional .TSWP.ObjectAttributeTable table_list_style = 7;
-  optional .TSWP.ObjectAttributeTable table_char_style = 8;
-  optional .TSWP.ObjectAttributeTable table_attachment = 9;
-  optional .TSWP.ObjectAttributeTable table_smartfield = 11;
-  optional .TSWP.ObjectAttributeTable table_layout_style = 12;
-  optional .TSWP.ParaDataAttributeTable table_para_starts = 14;
-  optional .TSWP.ObjectAttributeTable table_bookmark = 15;
-  optional .TSWP.ObjectAttributeTable table_footnote = 16;
-  optional .TSWP.ObjectAttributeTable table_section = 17;
-  optional .TSWP.ObjectAttributeTable table_rubyfield = 18;
-  optional .TSWP.StringAttributeTable table_language = 19;
-  optional .TSWP.StringAttributeTable table_dictation = 20;
-  optional .TSWP.ObjectAttributeTable table_insertion = 21;
-  optional .TSWP.ObjectAttributeTable table_deletion = 22;
-  optional .TSWP.ObjectAttributeTable table_highlight = 23;
-  optional .TSWP.ParaDataAttributeTable table_para_bidi = 24;
+  optional ObjectAttributeTable table_para_style = 5;
+  optional ParaDataAttributeTable table_para_data = 6;
+  optional ObjectAttributeTable table_list_style = 7;
+  optional ObjectAttributeTable table_char_style = 8;
+  optional ObjectAttributeTable table_attachment = 9;
+  optional ObjectAttributeTable table_smartfield = 11;
+  optional ObjectAttributeTable table_layout_style = 12;
+  optional ParaDataAttributeTable table_para_starts = 14;
+  optional ObjectAttributeTable table_bookmark = 15;
+  optional ObjectAttributeTable table_footnote = 16;
+  optional ObjectAttributeTable table_section = 17;
+  optional ObjectAttributeTable table_rubyfield = 18;
+  optional StringAttributeTable table_language = 19;
+  optional StringAttributeTable table_dictation = 20;
+  optional ObjectAttributeTable table_insertion = 21;
+  optional ObjectAttributeTable table_deletion = 22;
+  optional ObjectAttributeTable table_highlight = 23;
+  optional ParaDataAttributeTable table_para_bidi = 24;
+  optional OverlappingFieldAttributeTable table_overlapping_highlight = 25;
+  optional OverlappingFieldAttributeTable table_pencil_annotation = 26;
+  optional ObjectAttributeTable table_tatechuyoko = 27;
+  optional ObjectAttributeTable table_drop_cap_style = 28;
 }
 
 message HighlightArchive {
   optional .TSP.Reference commentStorage = 1;
+  optional string text_attribute_uuid_string = 2;
+}
+
+message PencilAnnotationArchive {
+  optional .TSP.Reference pencil_annotation_storage = 1;
+  optional string text_attribute_uuid_string = 2;
 }
 
 message FontFeatureArchive {
@@ -129,28 +150,33 @@ message CharacterStylePropertiesArchive {
     kSmallCaps = 2;
     kTitled = 3;
   }
+
   enum UnderlineType {
     kNoUnderline = 0;
     kSingleUnderline = 1;
     kDoubleUnderline = 2;
     kWavyUnderline = 3;
   }
+
   enum LigaturesType {
     kRequiredLigatures = 0;
     kStandardLigatures = 1;
     kAllLigatures = 2;
   }
+
   enum StrikethruType {
     kNoStrikethru = 0;
     kSingleStrikethru = 1;
     kDoubleStrikethru = 2;
     kTripleStrikethru = 3;
   }
+
   enum SuperscriptType {
     kNoScript = 0;
     kSuperscript = 1;
     kSubscript = 2;
   }
+
   optional bool bold = 1;
   optional bool italic = 2;
   optional float font_size = 3;
@@ -160,13 +186,13 @@ message CharacterStylePropertiesArchive {
   optional .TSP.Color font_color = 7;
   optional bool language_null = 8;
   optional string language = 9;
-  optional .TSWP.CharacterStylePropertiesArchive.SuperscriptType superscript = 10;
-  optional .TSWP.CharacterStylePropertiesArchive.UnderlineType underline = 11;
-  optional .TSWP.CharacterStylePropertiesArchive.StrikethruType strikethru = 12;
-  optional .TSWP.CharacterStylePropertiesArchive.CapitalizationType capitalization = 13;
+  optional CharacterStylePropertiesArchive.SuperscriptType superscript = 10;
+  optional CharacterStylePropertiesArchive.UnderlineType underline = 11;
+  optional CharacterStylePropertiesArchive.StrikethruType strikethru = 12;
+  optional CharacterStylePropertiesArchive.CapitalizationType capitalization = 13;
   optional float baseline_shift = 14;
   optional float kerning = 15;
-  optional .TSWP.CharacterStylePropertiesArchive.LigaturesType ligatures = 16;
+  optional CharacterStylePropertiesArchive.LigaturesType ligatures = 16;
   optional bool outline_color_null = 17;
   optional .TSP.Color outline_color = 18;
   optional float outline = 19;
@@ -184,18 +210,26 @@ message CharacterStylePropertiesArchive {
   optional bool word_strikethru = 31;
   optional bool word_underline = 32;
   optional bool font_features_null = 33;
-  repeated .TSWP.FontFeatureArchive font_features = 34;
-  optional .TSWP.WritingDirectionType writing_direction = 35 [default = kWritingDirectionNatural];
+  repeated FontFeatureArchive font_features = 34;
+  optional WritingDirectionType writing_direction = 35 [default = kWritingDirectionNatural];
   optional bool emphasis_marks_null = 36;
   optional string emphasis_marks = 37;
   optional bool compatibility_font_name_null = 38;
   optional string compatibility_font_name = 39;
+  optional bool is_named_point_size = 40;
+  optional bool capitalization_uses_linguistics = 41;
+  optional bool tate_chu_yoko = 42;
+  optional bool tsd_stroke_null = 43;
+  optional .TSD.StrokeArchive tsd_stroke = 44;
+  optional bool tsd_fill_null = 45;
+  optional .TSD.FillArchive tsd_fill = 46;
+  optional bool tsd_fill_should_fill_text_container = 47;
 }
 
 message CharacterStyleArchive {
   required .TSS.StyleArchive super = 1;
   optional uint32 override_count = 10 [default = 0];
-  optional .TSWP.CharacterStylePropertiesArchive char_properties = 11;
+  optional CharacterStylePropertiesArchive char_properties = 11;
 }
 
 message TabArchive {
@@ -205,13 +239,14 @@ message TabArchive {
     kTabAlignmentRight = 2;
     kTabAlignmentDecimal = 3;
   }
+
   optional float position = 1;
-  optional .TSWP.TabArchive.TabAlignmentType alignment = 2;
+  optional TabArchive.TabAlignmentType alignment = 2;
   optional string leader = 3;
 }
 
 message TabsArchive {
-  repeated .TSWP.TabArchive tabs = 1;
+  repeated TabArchive tabs = 1;
 }
 
 message LineSpacingArchive {
@@ -222,7 +257,8 @@ message LineSpacingArchive {
     kMaximumLineSpacing = 3;
     kSpaceBetweenLineSpacing = 4;
   }
-  optional .TSWP.LineSpacingArchive.LineSpacingModeType mode = 1;
+
+  optional LineSpacingArchive.LineSpacingModeType mode = 1;
   optional float amount = 2;
   optional float baselineRule = 3;
 }
@@ -235,19 +271,33 @@ message ParagraphStylePropertiesArchive {
     TATvalue3 = 3;
     TATvalue4 = 4;
   }
-  enum ParagraphBorderType {
+
+  enum DeprecatedParagraphBorderType {
     PBTvalue0 = 0;
     PBTvalue1 = 1;
     PBTvalue2 = 2;
     PBTvalue3 = 3;
     PBTvalue4 = 4;
+    PBTvalue5 = 8;
+    PBTvalue6 = 9;
+    PBTvalue7 = 10;
+    PBTvalue8 = 11;
+    PBTvalue9 = 16;
+    PBTvalue10 = 17;
+    PBTvalue11 = 18;
+    PBTvalue12 = 19;
+    PBTvalue13 = 24;
+    PBTvalue14 = 25;
+    PBTvalue15 = 26;
   }
+
   enum OutlineStyleType {
     OSTvalue0 = 0;
     OSTvalue1 = 1;
     OSTvalue2 = 2;
   }
-  optional .TSWP.ParagraphStylePropertiesArchive.TextAlignmentType alignment = 1;
+
+  optional ParagraphStylePropertiesArchive.TextAlignmentType alignment = 1;
   optional bool decimal_tab_null = 2;
   optional string decimal_tab = 3;
   optional float default_tab_stops = 4;
@@ -259,20 +309,20 @@ message ParagraphStylePropertiesArchive {
   optional bool keep_with_next = 10;
   optional float left_indent = 11;
   optional bool line_spacing_null = 12;
-  optional .TSWP.LineSpacingArchive line_spacing = 13;
+  optional LineSpacingArchive line_spacing = 13;
   optional bool page_break_before = 14;
-  optional .TSWP.ParagraphStylePropertiesArchive.ParagraphBorderType borders = 15;
-  optional bool rule_offset_null = 16;
-  optional .TSP.Point rule_offset = 17;
+  optional ParagraphStylePropertiesArchive.DeprecatedParagraphBorderType deprecated_borders = 15;
+  optional bool historical_rule_offset_null = 16;
+  optional .TSP.Point historical_rule_offset = 17;
   optional float rule_width = 18;
   optional float right_indent = 19;
   optional float space_after = 20;
   optional float space_before = 21;
   optional bool tabs_null = 24;
-  optional .TSWP.TabsArchive tabs = 25;
+  optional TabsArchive tabs = 25;
   optional bool widow_control = 26;
   optional uint32 outline_level = 27;
-  optional .TSWP.ParagraphStylePropertiesArchive.OutlineStyleType outline_style = 28;
+  optional ParagraphStylePropertiesArchive.OutlineStyleType outline_style = 28;
   optional bool following_style_id_null = 29;
   optional string following_style_id = 30;
   optional bool stroke_null = 31;
@@ -280,37 +330,32 @@ message ParagraphStylePropertiesArchive {
   optional bool show_in_toc = 33;
   optional bool toc_style_id_null = 34;
   optional string toc_style_id = 35;
-  optional .TSWP.WritingDirectionType writing_direction = 38 [default = kWritingDirectionNatural];
+  optional WritingDirectionType writing_direction = 38 [default = kWritingDirectionNatural];
   optional bool list_style_null = 39;
   optional .TSP.Reference list_style = 40;
   optional bool following_style_null = 41;
   optional .TSP.Reference following_style = 42;
+  optional bool show_in_bookmarks_list = 43;
+  optional bool show_in_toc_navigator = 44;
+  optional int32 border_positions = 45;
+  optional bool rounded_corners = 46;
 }
 
 message ParagraphStyleArchive {
   required .TSS.StyleArchive super = 1;
   optional uint32 override_count = 10 [default = 0];
-  optional .TSWP.CharacterStylePropertiesArchive char_properties = 11;
-  optional .TSWP.ParagraphStylePropertiesArchive para_properties = 12;
+  optional CharacterStylePropertiesArchive char_properties = 11;
+  optional ParagraphStylePropertiesArchive para_properties = 12;
 }
 
 message ListStyleArchive {
-  message LabelGeometry {
-    optional float scale = 1 [default = 1];
-    optional float baseline_offset = 2 [default = 0];
-    optional bool scale_with_text = 3 [default = true];
-  }
-  message LabelImage {
-    optional .TSP.DataReference image = 3;
-    optional bool image_null = 2;
-    optional .TSP.Reference database_image = 1;
-  }
   enum LabelType {
     kNone = 0;
     kImage = 1;
     kString = 2;
     kNumber = 3;
   }
+
   enum NumberType {
     kNumericDecimal = 0;
     kNumericDoubleParen = 1;
@@ -374,23 +419,39 @@ message ListStyleArchive {
     kHebrewAlphaDoubleParenKind = 59;
     kHebrewAlphaRightParenKind = 60;
     kHebrewBiblicalStandardKind = 61;
+    kHebrewBiblicalDecimalKind = 62;
+    kHebrewBiblicalDoubleParenKind = 63;
+    kHebrewBiblicalRightParenKind = 64;
   }
+
+  message LabelGeometry {
+    optional float scale = 1 [default = 1];
+    optional float baseline_offset = 2 [default = 0];
+    optional bool scale_with_text = 3 [default = true];
+  }
+
+  message LabelImage {
+    optional .TSP.DataReference image = 3;
+    optional bool image_null = 2;
+    optional .TSP.Reference database_image = 1;
+  }
+
   required .TSS.StyleArchive super = 1;
   optional uint32 override_count = 10 [default = 0];
-  repeated .TSWP.ListStyleArchive.LabelType label_types = 11;
+  repeated ListStyleArchive.LabelType label_types = 11;
   repeated float text_indents = 12;
   repeated float indents = 13;
-  repeated .TSWP.ListStyleArchive.LabelGeometry geometries = 14;
-  repeated .TSWP.ListStyleArchive.NumberType number_types = 15;
+  repeated ListStyleArchive.LabelGeometry geometries = 14;
+  repeated ListStyleArchive.NumberType number_types = 15;
   repeated string strings = 16;
-  repeated .TSWP.ListStyleArchive.LabelImage images = 17;
+  repeated ListStyleArchive.LabelImage images = 17;
   optional bool shadow_null = 18;
   optional .TSD.ShadowArchive shadow = 19;
   optional bool font_color_null = 20;
   optional .TSP.Color font_color = 21;
   optional bool font_name_null = 22;
   optional string font_name = 23;
-  optional .TSWP.WritingDirectionType writing_direction = 24 [default = kWritingDirectionNatural];
+  optional WritingDirectionType writing_direction = 24 [default = kWritingDirectionNatural];
   repeated bool tiered_numbers = 25;
 }
 
@@ -405,16 +466,19 @@ message ColumnsArchive {
     optional uint32 count = 1;
     optional float gap = 2;
   }
+
   message NonEqualColumnsArchive {
     message GapWidthArchive {
       required float gap = 1;
       required float width = 2;
     }
+
     required float first = 1;
-    repeated .TSWP.ColumnsArchive.NonEqualColumnsArchive.GapWidthArchive following = 2;
+    repeated ColumnsArchive.NonEqualColumnsArchive.GapWidthArchive following = 2;
   }
-  optional .TSWP.ColumnsArchive.EqualColumnsArchive equal_columns = 1;
-  optional .TSWP.ColumnsArchive.NonEqualColumnsArchive non_equal_columns = 2;
+
+  optional ColumnsArchive.EqualColumnsArchive equal_columns = 1;
+  optional ColumnsArchive.NonEqualColumnsArchive non_equal_columns = 2;
 }
 
 message PaddingArchive {
@@ -431,24 +495,25 @@ message ColumnStylePropertiesArchive {
     kFrameAlignBottom = 2;
     kFrameAlignJustify = 3;
   }
+
   optional bool continuous = 1;
   optional bool shrink_to_fit = 2;
   optional bool vertical_text = 3;
   optional float min_horizontal_inset = 4;
-  optional .TSWP.ColumnStylePropertiesArchive.VerticalAlignmentType vertical_alignment = 5;
+  optional ColumnStylePropertiesArchive.VerticalAlignmentType vertical_alignment = 5;
   optional bool columns_null = 6;
-  optional .TSWP.ColumnsArchive columns = 7;
+  optional ColumnsArchive columns = 7;
   optional bool margins_null = 8;
-  optional .TSWP.PaddingArchive margins = 9;
+  optional PaddingArchive margins = 9;
   optional bool padding_null = 10;
-  optional .TSWP.PaddingArchive padding = 11;
-  optional .TSWP.WritingDirectionType writing_direction = 12 [default = kWritingDirectionNatural];
+  optional PaddingArchive padding = 11;
+  optional WritingDirectionType writing_direction = 12 [default = kWritingDirectionNatural];
 }
 
 message ColumnStyleArchive {
   required .TSS.StyleArchive super = 1;
   optional uint32 override_count = 10 [default = 0];
-  optional .TSWP.ColumnStylePropertiesArchive column_properties = 11;
+  optional ColumnStylePropertiesArchive column_properties = 11;
 }
 
 message ShapeStylePropertiesArchive {
@@ -458,22 +523,24 @@ message ShapeStylePropertiesArchive {
     kFrameAlignBottom = 2;
     kFrameAlignJustify = 3;
   }
+
   optional bool shrink_to_fit = 1;
-  optional .TSWP.ShapeStylePropertiesArchive.VerticalAlignmentType vertical_alignment = 2;
+  optional ShapeStylePropertiesArchive.VerticalAlignmentType vertical_alignment = 2;
   optional bool columns_null = 3;
-  optional .TSWP.ColumnsArchive columns = 4;
+  optional ColumnsArchive columns = 4;
   optional bool padding_null = 5;
-  optional .TSWP.PaddingArchive padding = 6;
+  optional PaddingArchive padding = 6;
   optional uint32 default_text_preset_index = 7;
   optional bool vertical_text = 8;
   optional bool paragraph_style_null = 9;
   optional .TSP.Reference paragraph_style = 10;
+  optional bool vertical_text_40 = 11;
 }
 
 message ShapeStyleArchive {
   required .TSD.ShapeStyleArchive super = 1;
   optional uint32 override_count = 10 [default = 0];
-  optional .TSWP.ShapeStylePropertiesArchive shape_properties = 11;
+  optional ShapeStylePropertiesArchive shape_properties = 11;
 }
 
 message ThemePresetsArchive {
@@ -484,9 +551,7 @@ message ThemePresetsArchive {
   repeated .TSP.Reference toc_settings_presets = 5;
   repeated .TSP.Reference character_style_presets = 6;
   repeated .TSP.Reference paragraph_style_presets = 7;
-  extend .TSS.ThemeArchive {
-    optional .TSWP.ThemePresetsArchive extension = 110;
-  }
+  repeated .TSP.Reference dropcap_style_presets = 8;
 }
 
 message TextPresetDisplayItemArchive {
@@ -501,8 +566,8 @@ message TOCEntryStylePropertiesArchive {
 }
 
 message TOCEntryStyleArchive {
-  required .TSWP.ParagraphStyleArchive super = 1;
-  optional .TSWP.TOCEntryStylePropertiesArchive toc_properties = 2;
+  required ParagraphStyleArchive super = 1;
+  optional TOCEntryStylePropertiesArchive toc_properties = 2;
 }
 
 message TOCSettingsArchive {
@@ -511,9 +576,10 @@ message TOCSettingsArchive {
     optional .TSP.Reference toc_entry_style = 2;
     optional bool show_in_toc = 3;
   }
+
   optional string toc_name = 1;
   optional uint32 toc_scope = 2;
-  repeated .TSWP.TOCSettingsArchive.TOCEntryData entries = 3;
+  repeated TOCSettingsArchive.TOCEntryData entries = 3;
 }
 
 message TOCEntryInstanceArchive {
@@ -522,78 +588,13 @@ message TOCEntryInstanceArchive {
   required uint32 number_format = 3;
   required string heading = 4;
   required .TSP.Reference indexed_style = 5;
+  optional .TSP.Reference indexed_list_style = 6;
+  optional uint32 indexed_list_start = 7;
+  optional uint32 indexed_paragraph_level = 8;
+  optional string number_format_name = 9;
 }
 
 message UndoTransaction {
-  message GenericTransaction {
-    required uint32 value1 = 1;
-    required uint32 value2 = 2;
-    required uint32 value3 = 3;
-  }
-  message TextTransaction {
-    required uint32 insert_location = 1;
-    required uint32 insert_length = 2;
-    optional string string_to_delete = 3;
-  }
-  message CharIndexTransaction {
-    required uint32 char_index = 1;
-    required uint32 count = 2;
-    optional .TSP.Reference object = 3;
-  }
-  message ReplaceCharIndexTransaction {
-    required uint32 attribute_index = 1;
-    required uint32 char_index = 2;
-  }
-  message AttributeIndexTransaction {
-    required uint32 attribute_index = 1;
-    required uint32 char_index = 2;
-    optional .TSP.Reference object = 3;
-    optional string string = 4;
-  }
-  message InsertAttributeTransaction {
-    required uint32 attribute_index = 1;
-    required uint32 attribute_count = 2;
-    optional .TSP.Reference object = 3;
-    optional string string = 4;
-  }
-  message InsertNilTransaction {
-    required uint32 attribute_index = 1;
-    required uint32 attribute_count = 2;
-  }
-  message CharDeltaTransaction {
-    required uint32 char_index = 1;
-    required uint32 attribute_index = 2;
-    required sint32 char_delta = 3;
-  }
-  message ParagraphDataTransaction {
-    required uint32 attribute_index = 1;
-    required uint32 first = 2;
-    required uint32 second = 3;
-    required uint32 char_index = 4;
-  }
-  message ObjectDOLCTransaction {
-    required uint32 flags = 1;
-    optional .TSP.Reference object = 2;
-  }
-  message CTDateTransaction {
-    required uint32 attribute_index = 1;
-    optional .TSP.Date date = 2;
-  }
-  message UnionTransaction {
-    required .TSWP.UndoTransaction.UndoKind kind = 1;
-    optional uint32 table = 2;
-    optional .TSWP.UndoTransaction.GenericTransaction generic = 5;
-    optional .TSWP.UndoTransaction.TextTransaction text = 6;
-    optional .TSWP.UndoTransaction.CharIndexTransaction char_index = 7;
-    optional .TSWP.UndoTransaction.ReplaceCharIndexTransaction replace_char_index = 8;
-    optional .TSWP.UndoTransaction.AttributeIndexTransaction attribute_index = 9;
-    optional .TSWP.UndoTransaction.InsertNilTransaction insert_nil = 10;
-    optional .TSWP.UndoTransaction.InsertAttributeTransaction insert_attribute = 11;
-    optional .TSWP.UndoTransaction.CharDeltaTransaction char_delta = 12;
-    optional .TSWP.UndoTransaction.ParagraphDataTransaction paragraph_data = 13;
-    optional .TSWP.UndoTransaction.ObjectDOLCTransaction object_dolc = 14;
-    optional .TSWP.UndoTransaction.CTDateTransaction ct_date = 15;
-  }
   enum UndoKind {
     REPLACE_TEXT = 1;
     INSERT_ATTRIBUTE = 2;
@@ -606,32 +607,159 @@ message UndoTransaction {
     OBJECT_DOLC = 9;
     CT_DATE = 10;
   }
-  repeated .TSWP.UndoTransaction.UnionTransaction entries = 1;
+
+  enum ActionKind {
+    ACTION_UNDEFINED = 0;
+    ACTION_TEXT = 1;
+    ACTION_ATTRIBUTE = 2;
+  }
+
+  enum ActionGroupKind {
+    ACTION_GROUP_UNDEFINED = 0;
+    ACTION_GROUP_TEXT = 1;
+    ACTION_GROUP_ATTRIBUTE = 2;
+  }
+
+  message GenericTransaction {
+    required uint32 value1 = 1;
+    required uint32 value2 = 2;
+    required uint32 value3 = 3;
+  }
+
+  message TextTransaction {
+    required uint32 insert_location = 1;
+    required uint32 insert_length = 2;
+    optional string string_to_delete = 3;
+  }
+
+  message CharIndexTransaction {
+    required uint32 char_index = 1;
+    required uint32 count = 2;
+    optional .TSP.Reference object = 3;
+  }
+
+  message ReplaceCharIndexTransaction {
+    required uint32 attribute_index = 1;
+    required uint32 char_index = 2;
+  }
+
+  message AttributeIndexTransaction {
+    required uint32 attribute_index = 1;
+    required uint32 char_index = 2;
+    optional .TSP.Reference object = 3;
+    optional string string = 4;
+  }
+
+  message InsertAttributeTransaction {
+    required uint32 attribute_index = 1;
+    required uint32 attribute_count = 2;
+    optional .TSP.Reference object = 3;
+    optional string string = 4;
+  }
+
+  message InsertNilTransaction {
+    required uint32 attribute_index = 1;
+    required uint32 attribute_count = 2;
+  }
+
+  message CharDeltaTransaction {
+    required uint32 char_index = 1;
+    required uint32 attribute_index = 2;
+    required sint32 char_delta = 3;
+  }
+
+  message ParagraphDataTransaction {
+    required uint32 attribute_index = 1;
+    required uint32 first = 2;
+    required uint32 second = 3;
+    required uint32 char_index = 4;
+  }
+
+  message ObjectDOLCTransaction {
+    required uint32 flags = 1;
+    optional .TSP.Reference object = 2;
+  }
+
+  message CTDateTransaction {
+    required uint32 attribute_index = 1;
+    optional .TSP.Date date = 2;
+  }
+
+  message UnionTransaction {
+    required UndoTransaction.UndoKind kind = 1;
+    optional uint32 table = 2;
+    optional UndoTransaction.GenericTransaction generic = 5;
+    optional UndoTransaction.TextTransaction text = 6;
+    optional UndoTransaction.CharIndexTransaction char_index = 7;
+    optional UndoTransaction.ReplaceCharIndexTransaction replace_char_index = 8;
+    optional UndoTransaction.AttributeIndexTransaction attribute_index = 9;
+    optional UndoTransaction.InsertNilTransaction insert_nil = 10;
+    optional UndoTransaction.InsertAttributeTransaction insert_attribute = 11;
+    optional UndoTransaction.CharDeltaTransaction char_delta = 12;
+    optional UndoTransaction.ParagraphDataTransaction paragraph_data = 13;
+    optional UndoTransaction.ObjectDOLCTransaction object_dolc = 14;
+    optional UndoTransaction.CTDateTransaction ct_date = 15;
+  }
+
+  message StorageAction {
+    required UndoTransaction.ActionKind kind = 1;
+    optional uint32 flags = 2;
+    optional uint32 table = 3;
+    optional .TSP.Range range = 4;
+    optional string string = 5;
+    optional .TSP.Reference object = 6;
+    optional .TSP.Date date = 7;
+    optional uint32 paragraph_level = 8;
+    optional uint32 paragraph_flags = 9;
+    optional uint32 paragraph_value = 10;
+    optional int32 placement_index = 11;
+    optional string placement_uuid_path = 12;
+    optional .TSP.Reference undo_object = 13;
+  }
+
+  message StorageActionGroup {
+    required UndoTransaction.ActionGroupKind kind = 1;
+    repeated UndoTransaction.StorageAction forward_actions = 3;
+    repeated UndoTransaction.StorageAction inverse_forward_actions = 4;
+    repeated UndoTransaction.StorageAction inverse_detail_actions = 6;
+  }
+
+  repeated UndoTransaction.UnionTransaction entries = 1;
+  repeated UndoTransaction.StorageActionGroup group_entries = 2;
+  optional uint32 flags = 3;
+  optional uint32 version = 4;
 }
 
 message UndoTransactionWrapperArchive {
-  required .TSWP.UndoTransaction undo_transaction = 1;
+  required UndoTransaction undo_transaction = 1;
 }
 
 message ShapeInfoArchive {
   required .TSD.ShapeArchive super = 1;
-  optional .TSP.Reference containedStorage = 2;
+  optional .TSP.Reference deprecated_storage = 2;
+  optional .TSP.Reference text_flow = 3;
+  optional .TSP.Reference owned_storage = 4;
+  optional bool is_text_box = 6;
 }
 
 message CommentInfoArchive {
-  required .TSWP.ShapeInfoArchive super = 1;
+  required ShapeInfoArchive super = 1;
   optional .TSP.Reference comment_storage = 2;
 }
 
 message TOCInfoArchive {
-  required .TSWP.ShapeInfoArchive super = 1;
+  required ShapeInfoArchive super = 1;
   optional .TSP.Reference toc_settings = 2;
   repeated .TSP.Reference toc_entry_data = 3;
   repeated .TSP.Range page_number_ranges = 4;
+  optional bool sync_toc_settings_with_toc_navigator = 5;
 }
 
 message TOCLayoutHintArchive {
   required .TSP.Range charRange = 1;
+}
+
+message EquationInfoArchive {
 }
 
 message TextualAttachmentArchive {
@@ -640,12 +768,13 @@ message TextualAttachmentArchive {
     kKindPageCount = 1;
     kKindFootnoteMark = 2;
   }
+
   optional string string_equivalent = 1;
-  optional .TSWP.TextualAttachmentArchive.Kind kind = 2;
+  optional TextualAttachmentArchive.Kind kind = 2;
 }
 
 message TSWPTOCPageNumberAttachmentArchive {
-  optional .TSWP.TextualAttachmentArchive super = 1;
+  optional TextualAttachmentArchive super = 1;
   optional string page_number = 2;
   optional string bookmark_name = 3;
 }
@@ -662,44 +791,48 @@ message DrawableAttachmentArchive {
 }
 
 message TOCAttachmentArchive {
-  required .TSWP.DrawableAttachmentArchive super = 1;
+  required DrawableAttachmentArchive super = 1;
 }
 
 message FootnoteReferenceAttachmentArchive {
-  optional .TSWP.TextualAttachmentArchive super = 1;
+  optional TextualAttachmentArchive super = 1;
   optional .TSP.Reference contained_storage = 2;
   optional string custom_mark_string = 3;
 }
 
 message NumberAttachmentArchive {
-  optional .TSWP.TextualAttachmentArchive super = 1;
+  optional TextualAttachmentArchive super = 1;
   optional uint32 number_format = 2;
   optional string string_value = 3;
+  optional string number_format_name = 4;
 }
 
 message SmartFieldArchive {
+  optional string text_attribute_uuid_string = 1;
 }
 
 message HyperlinkFieldArchive {
-  optional .TSWP.SmartFieldArchive super = 1;
+  optional SmartFieldArchive super = 1;
   optional string url_ref = 2;
 }
 
 message PlaceholderSmartFieldArchive {
-  optional .TSWP.SmartFieldArchive super = 1;
+  optional SmartFieldArchive super = 1;
   optional bool localizable = 2;
+  optional string script_tag = 3;
 }
 
 message UnsupportedHyperlinkFieldArchive {
-  optional .TSWP.PlaceholderSmartFieldArchive super = 1;
+  optional PlaceholderSmartFieldArchive super = 1;
   optional string url_ref = 2;
+  optional string url_original_ref = 3;
 }
 
 message BibliographySmartFieldArchive {
-  optional .TSWP.SmartFieldArchive super = 3;
+  optional SmartFieldArchive super = 3;
   repeated .TSP.Reference citation_records = 2;
   optional bool localizable = 4;
-  optional .TSWP.PlaceholderSmartFieldArchive old_super = 1;
+  optional PlaceholderSmartFieldArchive old_super = 1;
 }
 
 message CitationRecordArchive {
@@ -716,10 +849,10 @@ message CitationRecordArchive {
 }
 
 message CitationSmartFieldArchive {
-  optional .TSWP.SmartFieldArchive super = 3;
+  optional SmartFieldArchive super = 3;
   repeated .TSP.Reference citation_records = 2;
   optional bool localizable = 4;
-  optional .TSWP.PlaceholderSmartFieldArchive old_super = 1;
+  optional PlaceholderSmartFieldArchive old_super = 1;
 }
 
 message DateTimeSmartFieldArchive {
@@ -728,6 +861,7 @@ message DateTimeSmartFieldArchive {
     kDateTimeUpdatePlanAuto = 1;
     kDateTimeUpdatePlanOnce = 2;
   }
+
   enum DateTimeFormatterStyle {
     kDateTimeFormatterStyleNone = 0;
     kDateTimeFormatterStyleShort = 1;
@@ -735,26 +869,34 @@ message DateTimeSmartFieldArchive {
     kDateTimeFormatterStyleLong = 3;
     kDateTimeFormatterStyleFull = 4;
   }
-  optional .TSWP.SmartFieldArchive super = 1;
+
+  optional SmartFieldArchive super = 1;
   optional string format = 2;
   optional string locale_identifier = 3;
-  optional .TSWP.DateTimeSmartFieldArchive.DateTimeFormatterStyle date_style = 4;
-  optional .TSWP.DateTimeSmartFieldArchive.DateTimeFormatterStyle time_style = 5;
-  optional .TSWP.DateTimeSmartFieldArchive.DateTimeUpdatePlan update_plan = 6;
+  optional DateTimeSmartFieldArchive.DateTimeFormatterStyle date_style = 4;
+  optional DateTimeSmartFieldArchive.DateTimeFormatterStyle time_style = 5;
+  optional DateTimeSmartFieldArchive.DateTimeUpdatePlan update_plan = 6;
   optional bool needs_update = 7;
   optional .TSP.Date date = 8;
 }
 
 message BookmarkFieldArchive {
-  optional .TSWP.SmartFieldArchive super = 1;
+  optional SmartFieldArchive super = 1;
   optional string name = 2;
   optional uint32 ranged = 3;
   optional uint32 hidden = 4;
 }
 
 message FilenameSmartFieldArchive {
-  optional .TSWP.PlaceholderSmartFieldArchive super = 1;
+  optional PlaceholderSmartFieldArchive super = 1;
   optional uint32 display_flags = 2;
+}
+
+message MergeFieldTypeArchive {
+  optional string contacts_property = 2;
+  optional string contacts_key = 3;
+  optional string contacts_label = 4;
+  optional string table_key = 5;
 }
 
 message MergeSmartFieldArchive {
@@ -762,15 +904,18 @@ message MergeSmartFieldArchive {
     kMergeCategoryTo = 0;
     kMergeCategoryFrom = 1;
   }
-  optional .TSWP.PlaceholderSmartFieldArchive super = 1;
-  optional string property = 2;
-  optional string label = 3;
-  optional string key = 4;
-  optional .TSWP.MergeSmartFieldArchive.MergeCategory category = 5;
+
+  optional PlaceholderSmartFieldArchive super = 1;
+  optional string contacts_property = 2;
+  optional string contacts_key = 3;
+  optional string contacts_label = 4;
+  optional MergeSmartFieldArchive.MergeCategory category = 5;
   optional bool requires_following_whitespace = 6;
   optional string whitespace = 7;
   optional string guid = 8;
-  optional string table_field = 9;
+  optional string table_key = 9;
+  optional MergeFieldTypeArchive field_type = 10;
+  optional bool has_custom_text = 11;
 }
 
 message TOCSmartFieldArchive {
@@ -779,13 +924,18 @@ message TOCSmartFieldArchive {
     optional .TSP.Reference target_style = 2;
     optional .TSP.Range range = 3;
   }
-  optional .TSWP.PlaceholderSmartFieldArchive super = 1;
-  repeated .TSWP.TOCSmartFieldArchive.TOCEntry toc_entries = 2;
+
+  optional PlaceholderSmartFieldArchive super = 1;
+  repeated TOCSmartFieldArchive.TOCEntry toc_entries = 2;
 }
 
 message RubyFieldArchive {
-  optional .TSWP.SmartFieldArchive super = 1;
+  optional SmartFieldArchive super = 1;
   optional string ruby_text = 2;
+}
+
+message TateChuYokoFieldArchive {
+  optional SmartFieldArchive super = 1;
 }
 
 message ChangeArchive {
@@ -793,10 +943,11 @@ message ChangeArchive {
     kChangeKindInsertion = 1;
     kChangeKindDeletion = 2;
   }
-  optional .TSWP.ChangeArchive.ChangeKind kind = 1;
+
+  optional ChangeArchive.ChangeKind kind = 1;
   optional .TSP.Reference session = 2;
   optional .TSP.Date date = 3;
-  optional bool hidden = 4;
+  optional string text_attribute_uuid_string = 4;
 }
 
 message ChangeSessionArchive {
@@ -806,5 +957,70 @@ message ChangeSessionArchive {
 }
 
 message SectionPlaceholderArchive {
+  optional .TSP.Reference parent_storage = 1;
+}
+
+message HyperlinkSelectionArchive {
+}
+
+message DateTimeSelectionArchive {
+}
+
+message FlowInfoArchive {
+  optional .TSP.Reference text_storage = 1;
+  repeated .TSP.Reference textboxes = 2;
+  optional uint32 user_interface_identifier = 3;
+}
+
+message FlowInfoContainerArchive {
+  repeated .TSP.Reference flow_infos = 1;
+  optional uint32 next_user_interface_identifier = 2;
+}
+
+message DropCapArchive {
+  enum DropCapType {
+    TSWPDropCapTypeText = 0;
+    TSWPDropCapTypeShape = 1;
+    TSWPDropCapTypeImage = 2;
+  }
+
+  enum DropCapWrapType {
+    TSWPDropCapWrapTypeRectangular = 0;
+    TSWPDropCapWrapTypeContour = 1;
+    TSWPDropCapWrapTypeNone = 2;
+  }
+
+  optional DropCapArchive.DropCapType type = 1 [default = TSWPDropCapTypeText];
+  optional uint32 number_of_lines = 2 [default = 3];
+  optional uint32 number_of_raised_lines = 3 [default = 0];
+  optional float deprecated_outdent = 4;
+  optional double outdent = 11 [default = 0];
+  optional float deprecated_padding = 5;
+  optional double padding = 12 [default = 0];
+  optional DropCapArchive.DropCapWrapType wrap_type = 6 [default = TSWPDropCapWrapTypeRectangular];
+  optional bool shape_enabled = 7 [default = false];
+  optional float deprecated_corner_radius = 8;
+  optional double corner_radius = 13 [default = 0];
+  optional float deprecated_character_scale = 9;
+  optional double character_scale = 14 [default = 1];
+  optional uint32 number_of_characters = 10 [default = 1];
+}
+
+message DropCapStylePropertiesArchive {
+  optional DropCapArchive drop_cap = 1;
+  optional .TSD.StrokeArchive drop_cap_shape_stroke = 3;
+  optional bool drop_cap_shape_fill_null = 4;
+  optional .TSD.FillArchive drop_cap_shape_fill = 5;
+}
+
+message DropCapStyleArchive {
+  required .TSS.StyleArchive super = 1;
+  optional uint32 override_count = 10 [default = 0];
+  optional CharacterStylePropertiesArchive char_properties = 11;
+  optional DropCapStylePropertiesArchive drop_cap_properties = 12;
+}
+
+message CollaboratorTextCursorSubselectionArchive {
+  optional SelectionArchive text_selection = 1;
 }
 

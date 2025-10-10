@@ -8,347 +8,351 @@ import (
 
 func decodeKeynote(typ uint32, payload []byte) (interface{}, error) {
 	switch typ {
+
 	case 1:
-		value := &KN.DocumentArchive{}
+		var value = &KN.DocumentArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 10:
-		value := &KN.ThemeArchive{}
+		var value = &KN.ThemeArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 100:
-		value := &KN.CommandBuildSetValueArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 10011:
-		value := &TSWP.SectionPlaceholderArchive{}
+		var value = &TSWP.SectionPlaceholderArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 101:
-		value := &KN.CommandShowInsertSlideArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 102:
-		value := &KN.CommandShowMoveSlideArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 103:
-		value := &KN.CommandShowRemoveSlideArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 104:
-		value := &KN.CommandSlideInsertDrawablesArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 105:
-		value := &KN.CommandSlideRemoveDrawableArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 106:
-		value := &KN.CommandSlideNodeSetPropertyArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 107:
-		value := &KN.CommandSlideInsertBuildArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 108:
-		value := &KN.CommandSlideMoveBuildWithoutMovingChunksArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 109:
-		value := &KN.CommandSlideRemoveBuildArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 11:
-		value := &KN.PasteboardNativeStorageArchive{}
+		var value = &KN.PasteboardNativeStorageArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 110:
-		value := &KN.CommandSlideInsertBuildChunkArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 111:
-		value := &KN.CommandSlideMoveBuildChunkArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 112:
-		value := &KN.CommandSlideRemoveBuildChunkArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 113:
-		value := &KN.CommandSlideSetValueArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 114:
-		value := &KN.CommandTransitionSetValueArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 115:
-		value := &KN.UIStateCommandGroupArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 116:
-		value := &KN.CommandSlidePasteDrawablesArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 117:
-		value := &KN.CommandSlideApplyThemeArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 118:
-		value := &KN.CommandSlideMoveDrawableZOrderArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 119:
-		value := &KN.CommandChangeMasterSlideArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 12:
-		value := &KN.PlaceholderArchive{}
+		var value = &KN.PlaceholderArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 123:
-		value := &KN.CommandShowSetSlideNumberVisibilityArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 124:
-		value := &KN.CommandShowSetValueArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 128:
-		value := &KN.CommandShowMarkOutOfSyncRecordingArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 129:
-		value := &KN.CommandShowRemoveRecordingArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 130:
-		value := &KN.CommandShowReplaceRecordingArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 131:
-		value := &KN.CommandShowSetSoundtrack{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 132:
-		value := &KN.CommandSoundtrackSetValue{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 133:
-		value := &KN.CommandMasterRescaleArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 134:
-		value := &KN.CommandMoveMastersArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 135:
-		value := &KN.CommandInsertMasterArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 136:
-		value := &KN.CommandSlideSetStyleArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 137:
-		value := &KN.CommandSlideSetPlaceholdersForTagsArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 138:
-		value := &KN.CommandBuildChunkSetValueArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 139:
-		value := &KN.CommandSlideMoveBuildChunksArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 14:
-		value := &TSWP.TextualAttachmentArchive{}
+		var value = &TSWP.TextualAttachmentArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 140:
-		value := &KN.CommandRemoveMasterArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 141:
-		value := &KN.CommandRenameMasterArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 142:
-		value := &KN.CommandMasterSetThumbnailTextArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 143:
-		value := &KN.CommandShowChangeThemeArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 144:
-		value := &KN.CommandSlidePrimitiveSetMasterArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 145:
-		value := &KN.CommandMasterSetBodyStylesArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 146:
-		value := &KN.CommandSlideReapplyMasterArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 147:
-		value := &KN.SlideCollectionCommandSelectionBehaviorArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 148:
-		value := &KN.ChartInfoGeometryCommandArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 15:
-		value := &KN.NoteArchive{}
+		var value = &KN.NoteArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 16:
-		value := &KN.RecordingArchive{}
+		var value = &KN.RecordingArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 17:
-		value := &KN.RecordingEventTrackArchive{}
+		var value = &KN.RecordingEventTrackArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 18:
-		value := &KN.RecordingMovieTrackArchive{}
+		var value = &KN.RecordingMovieTrackArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 19:
-		value := &KN.ClassicStylesheetRecordArchive{}
+		var value = &KN.ClassicStylesheetRecordArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 2:
-		value := &KN.ShowArchive{}
+		var value = &KN.ShowArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 20:
-		value := &KN.ClassicThemeRecordArchive{}
+		var value = &KN.ClassicThemeRecordArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 21:
-		value := &KN.Soundtrack{}
+		var value = &KN.Soundtrack{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 22:
-		value := &KN.SlideNumberAttachmentArchive{}
+		var value = &KN.SlideNumberAttachmentArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 23:
-		value := &KN.DesktopUILayoutArchive{}
+		var value = &KN.DesktopUILayoutArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 24:
-		value := &KN.CanvasSelectionArchive{}
+		var value = &KN.CanvasSelectionArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 25:
-		value := &KN.SlideCollectionSelectionArchive{}
+		var value = &KN.SlideCollectionSelectionArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 3:
-		value := &KN.UIStateArchive{}
+		var value = &KN.UIStateArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 4:
-		value := &KN.SlideNodeArchive{}
+		var value = &KN.SlideNodeArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 5:
-		value := &KN.SlideArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6:
-		value := &KN.SlideArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 7:
-		value := &KN.PlaceholderArchive{}
+		var value = &KN.PlaceholderArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 8:
-		value := &KN.BuildArchive{}
+		var value = &KN.BuildArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 9:
-		value := &KN.SlideStyleArchive{}
+		var value = &KN.SlideStyleArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	default:
+
+		// 兜底逻辑：尝试使用decodeCommon
 		return decodeCommon(typ, payload)
+
 	}
 }
