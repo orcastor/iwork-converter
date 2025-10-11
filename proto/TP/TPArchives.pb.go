@@ -583,7 +583,7 @@ func (MailMergeSettingsArchive_CurrentDataSource) EnumDescriptor() ([]byte, []in
 
 type DocumentArchive struct {
 	state                                                 protoimpl.MessageState `protogen:"open.v1"`
-	Super                                                 *TSA.DocumentArchive   `protobuf:"bytes,15,req,name=super" json:"super,omitempty"`
+	Super                                                 *TSA.DocumentArchive   `protobuf:"bytes,15,opt,name=super" json:"super,omitempty"`
 	Stylesheet                                            *TSP.Reference         `protobuf:"bytes,2,opt,name=stylesheet" json:"stylesheet,omitempty"`
 	FloatingDrawables                                     *TSP.Reference         `protobuf:"bytes,3,opt,name=floating_drawables,json=floatingDrawables" json:"floating_drawables,omitempty"`
 	BodyStorage                                           *TSP.Reference         `protobuf:"bytes,4,opt,name=body_storage,json=bodyStorage" json:"body_storage,omitempty"`
@@ -1527,7 +1527,7 @@ type PageTemplateArchive struct {
 	Name                            *string                                `protobuf:"bytes,1,opt,name=name" json:"name,omitempty"`
 	SectionTemplateDrawables        []*TSP.Reference                       `protobuf:"bytes,2,rep,name=section_template_drawables,json=sectionTemplateDrawables" json:"section_template_drawables,omitempty"`
 	PlaceholderDrawables            []*PageTemplateArchive_TagDrawablePair `protobuf:"bytes,3,rep,name=placeholder_drawables,json=placeholderDrawables" json:"placeholder_drawables,omitempty"`
-	HeadersFootersMatchPreviousPage *bool                                  `protobuf:"varint,4,req,name=headers_footers_match_previous_page,json=headersFootersMatchPreviousPage" json:"headers_footers_match_previous_page,omitempty"`
+	HeadersFootersMatchPreviousPage *bool                                  `protobuf:"varint,4,opt,name=headers_footers_match_previous_page,json=headersFootersMatchPreviousPage" json:"headers_footers_match_previous_page,omitempty"`
 	HideHeadersFooters              *bool                                  `protobuf:"varint,5,opt,name=hide_headers_footers,json=hideHeadersFooters" json:"hide_headers_footers,omitempty"`
 	BackgroundFill                  *TSD.FillArchive                       `protobuf:"bytes,6,opt,name=background_fill,json=backgroundFill" json:"background_fill,omitempty"`
 	GuideStorage                    *TSP.Reference                         `protobuf:"bytes,7,opt,name=guide_storage,json=guideStorage" json:"guide_storage,omitempty"`
@@ -4405,7 +4405,7 @@ const file_TPArchives_proto_rawDesc = "" +
 	"\n" +
 	"\x10TPArchives.proto\x12\x02TP\x1a\x11TSDArchives.proto\x1a\x11TSKArchives.proto\x1a\x12TSCKArchives.proto\x1a\x11TSPMessages.proto\x1a\x12TSWPArchives.proto\x1a\x11TSSArchives.proto\x1a\x11TSAArchives.proto\x1a\x12TSCHArchives.proto\"\xde\x0e\n" +
 	"\x0fDocumentArchive\x12*\n" +
-	"\x05super\x18\x0f \x02(\v2\x14.TSA.DocumentArchiveR\x05super\x12.\n" +
+	"\x05super\x18\x0f \x01(\v2\x14.TSA.DocumentArchiveR\x05super\x12.\n" +
 	"\n" +
 	"stylesheet\x18\x02 \x01(\v2\x0e.TSP.ReferenceR\n" +
 	"stylesheet\x12=\n" +
@@ -4536,7 +4536,7 @@ const file_TPArchives_proto_rawDesc = "" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12L\n" +
 	"\x1asection_template_drawables\x18\x02 \x03(\v2\x0e.TSP.ReferenceR\x18sectionTemplateDrawables\x12\\\n" +
 	"\x15placeholder_drawables\x18\x03 \x03(\v2'.TP.PageTemplateArchive.TagDrawablePairR\x14placeholderDrawables\x12L\n" +
-	"#headers_footers_match_previous_page\x18\x04 \x02(\bR\x1fheadersFootersMatchPreviousPage\x120\n" +
+	"#headers_footers_match_previous_page\x18\x04 \x01(\bR\x1fheadersFootersMatchPreviousPage\x120\n" +
 	"\x14hide_headers_footers\x18\x05 \x01(\bR\x12hideHeadersFooters\x129\n" +
 	"\x0fbackground_fill\x18\x06 \x01(\v2\x10.TSD.FillArchiveR\x0ebackgroundFill\x123\n" +
 	"\rguide_storage\x18\a \x01(\v2\x0e.TSP.ReferenceR\fguideStorage\x1ah\n" +

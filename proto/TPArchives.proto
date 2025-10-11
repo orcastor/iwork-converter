@@ -31,7 +31,7 @@ enum PageViewState {
 }
 
 message DocumentArchive {
-  required .TSA.DocumentArchive super = 15;
+  optional .TSA.DocumentArchive super = 15;
   optional .TSP.Reference stylesheet = 2;
   optional .TSP.Reference floating_drawables = 3;
   optional .TSP.Reference body_storage = 4;
@@ -179,7 +179,7 @@ message PageTemplateArchive {
   optional string name = 1;
   repeated .TSP.Reference section_template_drawables = 2;
   repeated PageTemplateArchive.TagDrawablePair placeholder_drawables = 3;
-  required bool headers_footers_match_previous_page = 4;
+  optional bool headers_footers_match_previous_page = 4;
   optional bool hide_headers_footers = 5;
   optional .TSD.FillArchive background_fill = 6;
   optional .TSP.Reference guide_storage = 7;

@@ -1063,7 +1063,7 @@ message NumberCellValueArchive {
   optional double value = 1;
   optional int32 unit_index = 2;
   optional string currency_code = 5;
-  required .TSK.FormatStructArchive format = 3;
+  optional .TSK.FormatStructArchive format = 3;
   optional bool format_is_implicit = 4;
   optional bool format_is_explicit = 6 [default = false];
   optional uint64 decimal_low = 7;
@@ -1071,8 +1071,8 @@ message NumberCellValueArchive {
 }
 
 message StringCellValueArchive {
-  required string value = 1;
-  required .TSK.FormatStructArchive format = 2;
+  optional string value = 1;
+  optional .TSK.FormatStructArchive format = 2;
   optional bool format_is_implicit = 3;
   optional bool format_is_explicit = 4 [default = false];
   optional bool is_regex = 5 [default = false];
@@ -1080,7 +1080,7 @@ message StringCellValueArchive {
 }
 
 message ErrorCellValueArchive {
-  required int32 error_type = 1;
+  optional int32 error_type = 1;
   optional int32 extra_info_int = 3;
   optional string extra_info_string = 4;
   optional double extra_info_double = 5;
@@ -1095,7 +1095,7 @@ message CellValueArchive {
     STRING_TYPE = 5;
   }
 
-  required CellValueArchive.CellValueType cell_value_type = 1;
+  optional CellValueArchive.CellValueType cell_value_type = 1;
   optional BooleanCellValueArchive boolean_value = 2;
   optional DateCellValueArchive date_value = 3;
   optional NumberCellValueArchive number_value = 4;

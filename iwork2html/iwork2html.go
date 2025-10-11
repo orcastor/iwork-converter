@@ -83,7 +83,7 @@ type Context struct {
 }
 
 // Control whether to output table cell debug logs
-var debugTableCells = true
+var debugTableCells = false
 
 // Control whether to output image processing debug logs
 var debugImages = true
@@ -339,6 +339,46 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
 	// Extract string and rich text tables
 	var stringTable []*TST.TableDataList_ListEntry
 	var richTable []*TST.TableDataList_ListEntry
+
+	// Extract merge region map
+	var mergeRegions []*TST.CellRange
+	if debugTableCells {
+		if tm.BaseDataStore != nil {
+			if tm.BaseDataStore.MergeRegionMap != nil {
+				fmt.Printf("DEBUG: MergeRegionMap reference found: ID=%d\n", *tm.BaseDataStore.MergeRegionMap.Identifier)
+				// Try to deref and see what type it is
+				derefed := ctx.ix.Deref(tm.BaseDataStore.MergeRegionMap)
+				fmt.Printf("DEBUG: MergeRegionMap dereferenced type: %T\n", derefed)
+			} else {
+				fmt.Printf("DEBUG: No MergeRegionMap reference\n")
+			}
+		}
+	}
+	if tm.BaseDataStore != nil && tm.BaseDataStore.MergeRegionMap != nil {
+		if mrm, ok := ctx.ix.Deref(tm.BaseDataStore.MergeRegionMap).(*TST.MergeRegionMapArchive); ok {
+			mergeRegions = mrm.CellRange
+			if debugTableCells {
+				fmt.Printf("DEBUG: MergeRegionMap loaded with %d regions\n", len(mergeRegions))
+				for i, region := range mergeRegions {
+					if region.Origin != nil && region.Size != nil {
+						// Parse CellID from PackedData (row<<16 | col)
+						var fromRow, fromCol uint32
+						if region.Origin.PackedData != nil {
+							packed := *region.Origin.PackedData
+							fromRow = packed >> 16
+							fromCol = packed & 0xFFFF
+						}
+						toRow := fromRow + *region.Size.NumRows - 1
+						toCol := fromCol + *region.Size.NumColumns - 1
+						fmt.Printf("  MergeRegion[%d]: Row %d-%d, Col %d-%d (size: %d×%d)\n",
+							i, fromRow, toRow, fromCol, toCol,
+							*region.Size.NumRows, *region.Size.NumColumns)
+					}
+				}
+			}
+		}
+	}
+
 	if tm.BaseDataStore != nil {
 		if debugTableCells {
 			fmt.Printf("DEBUG: DataStore found\n")
@@ -351,6 +391,15 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
 				stringTable = tdl.Entries
 				if debugTableCells {
 					fmt.Printf("DEBUG: StringTable loaded with %d entries\n", len(stringTable))
+					for i, e := range stringTable {
+						if e != nil && e.Key != nil && e.String_ != nil {
+							preview := *e.String_
+							if len(preview) > 30 {
+								preview = preview[:30] + "..."
+							}
+							fmt.Printf("  StringTable[%d]: key=%d -> %q\n", i, *e.Key, preview)
+						}
+					}
 				}
 			} else {
 				if debugTableCells {
@@ -523,9 +572,7 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
 		RowInfo  *TST.TileRowInfo
 	}
 
-	// Track used keys per row to avoid duplicates within the same row
-	// Note: Same key can be used in different rows (e.g., header content)
-	usedKeys := make(map[string]bool) // Use "row:key" format to allow same key in different rows
+	// Note: Same key can be used in multiple cells (e.g., merged cells)
 
 	// Build a map of tile ID to tile for quick lookup
 	tileMap := make(map[uint32]*TST.Tile)
@@ -686,6 +733,53 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
 			fmt.Printf("DEBUG: Row %d - Raw offsets: %v\n", r, offsets)
 		}
 
+		// First pass: read all keys to detect merged cells
+		rowKeys := make([]uint32, cc)
+		for c := 0; c < cc; c++ {
+			if !hasContentColumns[c] {
+				continue
+			}
+
+			var offset uint16 = 65535
+			if c < len(contentOffsets) {
+				offset = contentOffsets[c]
+			}
+
+			// Read key from buffer
+			if offset != 65535 && len(rinfo.CellStorageBuffer) >= int(offset)+16 {
+				rowKeys[c] = LE.Uint32(rinfo.CellStorageBuffer[offset+12 : offset+16])
+			}
+		}
+
+		if debugTableCells && r == 10 {
+			fmt.Printf("DEBUG: Row %d keys: %v\n", r, rowKeys)
+		}
+
+		// Special handling for summary/total rows:
+		// If col 2 onwards have the same key, merge col 1 onwards
+		if r == len(orderedRows)-1 { // Last row
+			allSameFromCol2 := true
+			if len(rowKeys) > 2 {
+				firstKey := rowKeys[2]
+				for c := 3; c < len(rowKeys); c++ {
+					if rowKeys[c] != firstKey {
+						allSameFromCol2 = false
+						break
+					}
+				}
+				if allSameFromCol2 && firstKey != 0 {
+					// Merge: set col 2-N to have the same key as col 1
+					for c := 2; c < len(rowKeys); c++ {
+						rowKeys[c] = rowKeys[1]
+					}
+					if debugTableCells {
+						fmt.Printf("DEBUG: Row %d detected as summary row, merging col 1-%d\n", r, len(rowKeys)-1)
+						fmt.Printf("DEBUG: Row %d adjusted keys: %v\n", r, rowKeys)
+					}
+				}
+			}
+		}
+
 		// Only process columns that have content
 		actualColIndex := 0
 		for c := 0; c < cc; c++ {
@@ -707,6 +801,30 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
 			}
 
 			td := E(cellTag)
+
+			// Calculate colspan for merged cells
+			// Check if this cell and next cells have the same non-zero key
+			colspan := 1
+			if rowKeys[c] != 0 {
+				for nextCol := c + 1; nextCol < cc; nextCol++ {
+					if !hasContentColumns[nextCol] {
+						break
+					}
+					if rowKeys[nextCol] == rowKeys[c] {
+						colspan++
+					} else {
+						break
+					}
+				}
+			}
+
+			// Apply colspan if > 1
+			if colspan > 1 {
+				td.Attr = append(td.Attr, html.Attribute{Key: "colspan", Val: fmt.Sprintf("%d", colspan)})
+				if debugTableCells && r == 10 {
+					fmt.Printf("DEBUG: Cell[%d,%d] colspan=%d (key=%d)\n", r, c, colspan, rowKeys[c])
+				}
+			}
 
 			// Don't add extra header style classes, keep it simple
 			// if isHeaderRow {
@@ -751,133 +869,87 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
 			var key uint32
 			contentFound := false
 
-			// Only try buffer parsing if offset is not 65535
-			if offset != 65535 {
-				// Try different offsets to find the key
-				if len(rinfo.CellStorageBuffer) > int(offset)+8 {
-					// Try different possible key locations
-					possibleKeys := []uint32{
-						LE.Uint32(rinfo.CellStorageBuffer[offset+4 : offset+8]),   // Original location
-						LE.Uint32(rinfo.CellStorageBuffer[offset : offset+4]),     // At start
-						LE.Uint32(rinfo.CellStorageBuffer[offset+8 : offset+12]),  // After original
-						LE.Uint32(rinfo.CellStorageBuffer[offset+12 : offset+16]), // Further after original
-					}
+			// Parse cell type and key from buffer
+			var cellType uint8
 
-					if debugTableCells {
-						fmt.Printf("DEBUG: Trying to read key from buffer at different offsets: %v\n", possibleKeys)
-					}
+			// Determine which buffer to use: Regular or PreBnc
+			// Strategy: Use Regular buffer by default, only use PreBnc as fallback
+			usePreBnc := false
+			var activeBuffer []byte
+			var preBncOffset uint16 = 65535
 
-					// First, check if any of the possible keys exist in richTable (highest priority)
-					for _, possibleKey := range possibleKeys {
-						if possibleKey == 0 || possibleKey == 65535 {
-							continue // Skip invalid keys
-						}
+			// First, try Regular buffer
+			activeBuffer = rinfo.CellStorageBuffer
 
-						// Skip if this key has already been used in this row
-						keyStr := fmt.Sprintf("%d:%d", r, possibleKey)
-						if usedKeys[keyStr] {
-							if debugTableCells {
-								fmt.Printf("DEBUG: Key %d already used in row %d, skipping\n", possibleKey, r)
-							}
-							continue
-						}
-
-						// Check if this key value exists in richTable first (highest priority)
-						if len(richTable) > 0 {
-							for _, entry := range richTable {
-								if *entry.Key == possibleKey {
-									key = possibleKey
-									contentFound = true
-									usedKeys[keyStr] = true // Mark as used in this row
-									if debugTableCells {
-										fmt.Printf("DEBUG: Found matching key %d in richTable\n", key)
-									}
-									break
-								}
-							}
-						}
-
-						if contentFound {
-							break
+			// Only fallback to PreBnc if Regular buffer is empty/invalid for this cell
+			if offset == 65535 || len(rinfo.CellStorageBuffer) < int(offset)+16 {
+				// Check if PreBnc version exists and is valid for this cell
+				if len(rinfo.CellOffsetsPreBnc) > 0 && len(rinfo.CellStorageBufferPreBnc) > 0 {
+					preBncOffsets := make([]uint16, len(rinfo.CellOffsetsPreBnc)/2)
+					binary.Read(bytes.NewBuffer(rinfo.CellOffsetsPreBnc), LE, preBncOffsets)
+					if c < len(preBncOffsets) {
+						preBncOffset = preBncOffsets[c]
+						if preBncOffset != 65535 && len(rinfo.CellStorageBufferPreBnc) >= int(preBncOffset)+16 {
+							usePreBnc = true
+							activeBuffer = rinfo.CellStorageBufferPreBnc
+							offset = preBncOffset
 						}
 					}
-
-					// If no richTable key found, check stringTable
-					if !contentFound {
-						for _, possibleKey := range possibleKeys {
-							if possibleKey == 0 || possibleKey == 65535 {
-								continue // Skip invalid keys
-							}
-
-							// Skip if this key has already been used in this row
-							keyStr := fmt.Sprintf("%d:%d", r, possibleKey)
-							if usedKeys[keyStr] {
-								if debugTableCells {
-									fmt.Printf("DEBUG: Key %d already used in row %d, skipping\n", possibleKey, r)
-								}
-								continue
-							}
-
-							// Check if this key value exists in stringTable
-							if len(stringTable) > 0 {
-								for _, entry := range stringTable {
-									if *entry.Key == possibleKey {
-										key = possibleKey
-										contentFound = true
-										usedKeys[keyStr] = true // Mark as used in this row
-										if debugTableCells {
-											fmt.Printf("DEBUG: Found matching key %d in stringTable\n", key)
-										}
-										break
-									}
-								}
-							}
-
-							if contentFound {
-								break
-							}
-						}
-					}
-				}
-			} else {
-				if debugTableCells {
-					fmt.Printf("DEBUG: Skipping buffer parsing for empty cell (offset=65535)\n")
 				}
 			}
 
-			// Improved content allocation strategy
-			if !contentFound {
-				// Try to find content by checking all available content sources
-				// Use a more intelligent approach: try to find content by row and column
+			// Debug output for first column
+			if debugTableCells && c == 0 && r <= 10 {
+				fmt.Printf("\nDEBUG: Cell[%d,%d] buffer analysis:\n", r, c)
+				fmt.Printf("  Regular offset: %d\n", contentOffsets[c])
+				fmt.Printf("  PreBnc offset:  %d\n", preBncOffset)
+				fmt.Printf("  Using: %s\n", map[bool]string{true: "PreBnc", false: "Regular"}[usePreBnc])
+			}
 
-				// Calculate the actual content index based on the table structure
-				// For Numbers tables, content is typically stored in row-major order
-				contentIndex := r*int(cc) + c
-
-				if debugTableCells && r < 3 && c < 3 {
-					fmt.Printf("DEBUG: Cell at row %d, col %d, calculated contentIndex: %d (stringTable has %d entries)\n",
-						r, c, contentIndex, len(stringTable))
+			// Only try buffer parsing if offset is not 65535
+			if offset != 65535 && len(activeBuffer) >= int(offset)+16 {
+				// Debug: show complete 16-byte structure for first column
+				if debugTableCells && c == 0 && r <= 10 {
+					buf := activeBuffer[offset : offset+16]
+					fmt.Printf("  16-byte buffer: %v\n", buf)
+					fmt.Printf("  offset+0:  %d (0x%08x)\n", LE.Uint32(buf[0:4]), LE.Uint32(buf[0:4]))
+					fmt.Printf("  offset+4:  %d (0x%08x)\n", LE.Uint32(buf[4:8]), LE.Uint32(buf[4:8]))
+					fmt.Printf("  offset+8:  %d (0x%08x)\n", LE.Uint32(buf[8:12]), LE.Uint32(buf[8:12]))
+					fmt.Printf("  offset+12: %d (0x%08x) <-- key position\n", LE.Uint32(buf[12:16]), LE.Uint32(buf[12:16]))
+					fmt.Printf("  byte[0]=5, byte[1]=%d (cellType indicator)\n", buf[1])
 				}
 
-				// First, try to find content by calculated index in stringTable
-				if contentIndex < len(stringTable) {
-					key = *stringTable[contentIndex].Key
-					if debugTableCells && r < 3 && c < 3 {
-						fmt.Printf("DEBUG: Cell at row %d, col %d assigned key %d from stringTable[%d] (calculated index)\n",
-							r, c, key, contentIndex)
-					}
-				} else {
-					// Beyond content range, leave empty
-					if debugTableCells && r < 6 {
-						fmt.Printf("DEBUG: Cell at row %d, col %d left empty (beyond content range) - stringTable: %d, contentIndex: %d\n",
-							r, c, len(stringTable), contentIndex)
-					}
-					// Add empty placeholder to ensure cell has minimum height
-					emptyDiv := E("div")
-					emptyDiv.Attr = append(emptyDiv.Attr, html.Attribute{Key: "style", Val: "min-height: 1.2em; line-height: 1.2;"})
-					td.AppendChild(emptyDiv)
-					continue
+				// Parse cellType from byte[1] (when byte[0]=5)
+				if activeBuffer[offset] == 5 {
+					cellType = activeBuffer[offset+1]
 				}
+
+				// For Pages tables: key is at offset+12 (last 4 bytes of 16-byte cell structure)
+				key = LE.Uint32(activeBuffer[offset+12 : offset+16])
+
+				if debugTableCells && r <= 10 && c == 0 {
+					fmt.Printf("  cellType=%d, key=%d\n", cellType, key)
+				}
+
+				if key != 0 && key != 65535 {
+					contentFound = true
+				}
+			} else {
+				if debugTableCells && r < 6 {
+					fmt.Printf("DEBUG: Cell[%d,%d] is empty (offset=65535 or insufficient buffer)\n", r, c)
+				}
+			}
+
+			// If no valid key was found from buffer, this cell is empty
+			if !contentFound || key == 0 {
+				if debugTableCells && r < 6 {
+					fmt.Printf("DEBUG: Cell at row %d, col %d is empty (no valid key found)\n", r, c)
+				}
+				// Add empty placeholder to ensure cell has minimum height
+				emptyDiv := E("div")
+				emptyDiv.Attr = append(emptyDiv.Attr, html.Attribute{Key: "style", Val: "min-height: 1.2em; line-height: 1.2;"})
+				td.AppendChild(emptyDiv)
+				continue
 			}
 
 			// Debug: print the key that will be used for content lookup (only for first few cells)
@@ -980,20 +1052,13 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
 			}
 
 			// Normal content rendering
-			// First try string table
-			for _, entry := range stringTable {
-				if *entry.Key == key {
-					td.AppendChild(T(*entry.String_))
-					if debugTableCells {
-						fmt.Printf("DEBUG: Found string content for key %d: %s\n", key, *entry.String_)
-					}
-					contentFound = true
-					break
-				}
-			}
+			// Strategy depends on cellType:
+			// - cellType=9: richText content, look in richTable first
+			// - cellType=2: may be a simple number, try stringTable first, then check if key is a literal number
+			// - cellType=3: string content, look in stringTable
 
-			// If not found in string table, try rich text table
-			if !contentFound {
+			if cellType == 9 {
+				// Rich text: try richTable first
 				for _, entry := range richTable {
 					if *entry.Key == key {
 						if rt, ok := ctx.ix.Deref(entry.RichTextPayload).(*TST.RichTextPayloadArchive); ok {
@@ -1008,11 +1073,107 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
 						break
 					}
 				}
+				// Fallback to stringTable
+				if !contentFound {
+					for _, entry := range stringTable {
+						if *entry.Key == key {
+							td.AppendChild(T(*entry.String_))
+							if debugTableCells {
+								fmt.Printf("DEBUG: Found string content for key %d: %s\n", key, *entry.String_)
+							}
+							contentFound = true
+							break
+						}
+					}
+				}
+			} else if cellType == 2 {
+				// cellType=2: simple number/sequence cell
+				// For key values: use key as literal number
+				// Wrap in a div with proper styling for consistency with richText cells
+				numDiv := E("div")
+				numDiv.Attr = append(numDiv.Attr, html.Attribute{
+					Key: "style",
+					Val: "min-height: 1.2em; line-height: 1.2;",
+				})
+				numDiv.AppendChild(T(fmt.Sprintf("%d", key)))
+				td.AppendChild(numDiv)
+
+				if debugTableCells {
+					fmt.Printf("DEBUG: cellType=2, using key as literal number: %d\n", key)
+				}
+				contentFound = true
+			} else if cellType == 3 {
+				// cellType=3: string content from tables
+				// Try stringTable first
+				for _, entry := range stringTable {
+					if *entry.Key == key {
+						td.AppendChild(T(*entry.String_))
+						if debugTableCells {
+							fmt.Printf("DEBUG: Found string content for key %d: %s\n", key, *entry.String_)
+						}
+						contentFound = true
+						break
+					}
+				}
+
+				// Fallback to richTable
+				if !contentFound {
+					for _, entry := range richTable {
+						if *entry.Key == key {
+							if rt, ok := ctx.ix.Deref(entry.RichTextPayload).(*TST.RichTextPayloadArchive); ok {
+								if st, ok := ctx.ix.Deref(rt.Storage).(*TSWP.StorageArchive); ok && st != nil {
+									if debugTableCells {
+										fmt.Printf("DEBUG: Found rich text content for key %d\n", key)
+									}
+									ctx.storageToNodeForTable(st, td)
+									contentFound = true
+								}
+							}
+							break
+						}
+					}
+				}
+			} else {
+				// Unknown cellType: try both tables
+				for _, entry := range richTable {
+					if *entry.Key == key {
+						if rt, ok := ctx.ix.Deref(entry.RichTextPayload).(*TST.RichTextPayloadArchive); ok {
+							if st, ok := ctx.ix.Deref(rt.Storage).(*TSWP.StorageArchive); ok && st != nil {
+								if debugTableCells {
+									fmt.Printf("DEBUG: Found rich text content for key %d\n", key)
+								}
+								ctx.storageToNodeForTable(st, td)
+								contentFound = true
+							}
+						}
+						break
+					}
+				}
+				if !contentFound {
+					for _, entry := range stringTable {
+						if *entry.Key == key {
+							td.AppendChild(T(*entry.String_))
+							if debugTableCells {
+								fmt.Printf("DEBUG: Found string content for key %d: %s\n", key, *entry.String_)
+							}
+							contentFound = true
+							break
+						}
+					}
+				}
 			}
 
 			if !contentFound {
 				if debugTableCells {
 					fmt.Printf("DEBUG: No content found for cell at row %d, col %d with key %d\n", r, c, key)
+				}
+			}
+
+			// Skip merged cells (cells with same key as current cell)
+			if colspan > 1 {
+				c += (colspan - 1)
+				if debugTableCells && r == 10 {
+					fmt.Printf("DEBUG: Skipping %d merged cells, next c=%d\n", colspan-1, c+1)
 				}
 			}
 		}

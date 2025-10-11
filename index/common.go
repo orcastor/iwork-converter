@@ -9,7 +9,7 @@ import (
 	"github.com/orcastor/iwork-converter/proto/TSA"
 	"github.com/orcastor/iwork-converter/proto/TSCE"
 	"github.com/orcastor/iwork-converter/proto/TSCH"
-	PreUFF "github.com/orcastor/iwork-converter/proto/TSCH/PreUFF"
+	TSCH_PreUFF "github.com/orcastor/iwork-converter/proto/TSCH/PreUFF"
 	"github.com/orcastor/iwork-converter/proto/TSD"
 	"github.com/orcastor/iwork-converter/proto/TSK"
 	"github.com/orcastor/iwork-converter/proto/TSP"
@@ -496,6 +496,16 @@ func decodeCommon(typ uint32, payload []byte) (interface{}, error) {
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
+	case 2411:
+		var value = &TSWP.StorageArchive{}
+		err := proto.Unmarshal(payload, value)
+		return value, err
+
+	case 258:
+		var value = &TSK.CommandArchive{}
+		err := proto.Unmarshal(payload, value)
+		return value, err
+
 	case 3002:
 		var value = &TSD.DrawableArchive{}
 		err := proto.Unmarshal(payload, value)
@@ -746,6 +756,11 @@ func decodeCommon(typ uint32, payload []byte) (interface{}, error) {
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
+	case 3097:
+		var value = &TSD.DrawableArchive{}
+		err := proto.Unmarshal(payload, value)
+		return value, err
+
 	case 400:
 		var value = &TSS.StyleArchive{}
 		err := proto.Unmarshal(payload, value)
@@ -867,12 +882,12 @@ func decodeCommon(typ uint32, payload []byte) (interface{}, error) {
 		return value, err
 
 	case 5000:
-		var value = &PreUFF.ChartInfoArchive{}
+		var value = &TSCH_PreUFF.ChartInfoArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 5002:
-		var value = &PreUFF.ChartGridArchive{}
+		var value = &TSCH_PreUFF.ChartGridArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
@@ -1783,6 +1798,56 @@ func decodeCommon(typ uint32, payload []byte) (interface{}, error) {
 
 	case 6256:
 		var value = &TST.TableModelArchive{}
+		err := proto.Unmarshal(payload, value)
+		return value, err
+
+	case 6267:
+		var value = &TST.TableModelArchive{}
+		err := proto.Unmarshal(payload, value)
+		return value, err
+
+	case 6305:
+		var value = &TST.TableModelArchive{}
+		err := proto.Unmarshal(payload, value)
+		return value, err
+
+	case 6306:
+		var value = &TST.TableStyleArchive{}
+		err := proto.Unmarshal(payload, value)
+		return value, err
+
+	case 6316:
+		var value = &TST.DataStore{}
+		err := proto.Unmarshal(payload, value)
+		return value, err
+
+	case 6317:
+		var value = &TST.TableStyleArchive{}
+		err := proto.Unmarshal(payload, value)
+		return value, err
+
+	case 6318:
+		var value = &TST.TableModelArchive{}
+		err := proto.Unmarshal(payload, value)
+		return value, err
+
+	case 6366:
+		var value = &TST.TableModelArchive{}
+		err := proto.Unmarshal(payload, value)
+		return value, err
+
+	case 6372:
+		var value = &TST.TableStyleArchive{}
+		err := proto.Unmarshal(payload, value)
+		return value, err
+
+	case 6373:
+		var value = &TST.TableStyleArchive{}
+		err := proto.Unmarshal(payload, value)
+		return value, err
+
+	case 6383:
+		var value = &TST.TableStyleArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 

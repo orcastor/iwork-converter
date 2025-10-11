@@ -7136,7 +7136,7 @@ type NumberCellValueArchive struct {
 	Value            *float64                 `protobuf:"fixed64,1,opt,name=value" json:"value,omitempty"`
 	UnitIndex        *int32                   `protobuf:"varint,2,opt,name=unit_index,json=unitIndex" json:"unit_index,omitempty"`
 	CurrencyCode     *string                  `protobuf:"bytes,5,opt,name=currency_code,json=currencyCode" json:"currency_code,omitempty"`
-	Format           *TSK.FormatStructArchive `protobuf:"bytes,3,req,name=format" json:"format,omitempty"`
+	Format           *TSK.FormatStructArchive `protobuf:"bytes,3,opt,name=format" json:"format,omitempty"`
 	FormatIsImplicit *bool                    `protobuf:"varint,4,opt,name=format_is_implicit,json=formatIsImplicit" json:"format_is_implicit,omitempty"`
 	FormatIsExplicit *bool                    `protobuf:"varint,6,opt,name=format_is_explicit,json=formatIsExplicit,def=0" json:"format_is_explicit,omitempty"`
 	DecimalLow       *uint64                  `protobuf:"varint,7,opt,name=decimal_low,json=decimalLow" json:"decimal_low,omitempty"`
@@ -7238,8 +7238,8 @@ func (x *NumberCellValueArchive) GetDecimalHigh() uint64 {
 
 type StringCellValueArchive struct {
 	state                protoimpl.MessageState   `protogen:"open.v1"`
-	Value                *string                  `protobuf:"bytes,1,req,name=value" json:"value,omitempty"`
-	Format               *TSK.FormatStructArchive `protobuf:"bytes,2,req,name=format" json:"format,omitempty"`
+	Value                *string                  `protobuf:"bytes,1,opt,name=value" json:"value,omitempty"`
+	Format               *TSK.FormatStructArchive `protobuf:"bytes,2,opt,name=format" json:"format,omitempty"`
 	FormatIsImplicit     *bool                    `protobuf:"varint,3,opt,name=format_is_implicit,json=formatIsImplicit" json:"format_is_implicit,omitempty"`
 	FormatIsExplicit     *bool                    `protobuf:"varint,4,opt,name=format_is_explicit,json=formatIsExplicit,def=0" json:"format_is_explicit,omitempty"`
 	IsRegex              *bool                    `protobuf:"varint,5,opt,name=is_regex,json=isRegex,def=0" json:"is_regex,omitempty"`
@@ -7329,7 +7329,7 @@ func (x *StringCellValueArchive) GetIsCaseSensitiveRegex() bool {
 
 type ErrorCellValueArchive struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
-	ErrorType       *int32                 `protobuf:"varint,1,req,name=error_type,json=errorType" json:"error_type,omitempty"`
+	ErrorType       *int32                 `protobuf:"varint,1,opt,name=error_type,json=errorType" json:"error_type,omitempty"`
 	ExtraInfoInt    *int32                 `protobuf:"varint,3,opt,name=extra_info_int,json=extraInfoInt" json:"extra_info_int,omitempty"`
 	ExtraInfoString *string                `protobuf:"bytes,4,opt,name=extra_info_string,json=extraInfoString" json:"extra_info_string,omitempty"`
 	ExtraInfoDouble *float64               `protobuf:"fixed64,5,opt,name=extra_info_double,json=extraInfoDouble" json:"extra_info_double,omitempty"`
@@ -7397,7 +7397,7 @@ func (x *ErrorCellValueArchive) GetExtraInfoDouble() float64 {
 
 type CellValueArchive struct {
 	state         protoimpl.MessageState          `protogen:"open.v1"`
-	CellValueType *CellValueArchive_CellValueType `protobuf:"varint,1,req,name=cell_value_type,json=cellValueType,enum=TSCE.CellValueArchive_CellValueType" json:"cell_value_type,omitempty"`
+	CellValueType *CellValueArchive_CellValueType `protobuf:"varint,1,opt,name=cell_value_type,json=cellValueType,enum=TSCE.CellValueArchive_CellValueType" json:"cell_value_type,omitempty"`
 	BooleanValue  *BooleanCellValueArchive        `protobuf:"bytes,2,opt,name=boolean_value,json=booleanValue" json:"boolean_value,omitempty"`
 	DateValue     *DateCellValueArchive           `protobuf:"bytes,3,opt,name=date_value,json=dateValue" json:"date_value,omitempty"`
 	NumberValue   *NumberCellValueArchive         `protobuf:"bytes,4,opt,name=number_value,json=numberValue" json:"number_value,omitempty"`
@@ -11286,27 +11286,27 @@ const file_TSCEArchives_proto_rawDesc = "" +
 	"\n" +
 	"unit_index\x18\x02 \x01(\x05R\tunitIndex\x12#\n" +
 	"\rcurrency_code\x18\x05 \x01(\tR\fcurrencyCode\x120\n" +
-	"\x06format\x18\x03 \x02(\v2\x18.TSK.FormatStructArchiveR\x06format\x12,\n" +
+	"\x06format\x18\x03 \x01(\v2\x18.TSK.FormatStructArchiveR\x06format\x12,\n" +
 	"\x12format_is_implicit\x18\x04 \x01(\bR\x10formatIsImplicit\x123\n" +
 	"\x12format_is_explicit\x18\x06 \x01(\b:\x05falseR\x10formatIsExplicit\x12\x1f\n" +
 	"\vdecimal_low\x18\a \x01(\x04R\n" +
 	"decimalLow\x12!\n" +
 	"\fdecimal_high\x18\b \x01(\x04R\vdecimalHigh\"\xa3\x02\n" +
 	"\x16StringCellValueArchive\x12\x14\n" +
-	"\x05value\x18\x01 \x02(\tR\x05value\x120\n" +
-	"\x06format\x18\x02 \x02(\v2\x18.TSK.FormatStructArchiveR\x06format\x12,\n" +
+	"\x05value\x18\x01 \x01(\tR\x05value\x120\n" +
+	"\x06format\x18\x02 \x01(\v2\x18.TSK.FormatStructArchiveR\x06format\x12,\n" +
 	"\x12format_is_implicit\x18\x03 \x01(\bR\x10formatIsImplicit\x123\n" +
 	"\x12format_is_explicit\x18\x04 \x01(\b:\x05falseR\x10formatIsExplicit\x12 \n" +
 	"\bis_regex\x18\x05 \x01(\b:\x05falseR\aisRegex\x12<\n" +
 	"\x17is_case_sensitive_regex\x18\x06 \x01(\b:\x05falseR\x14isCaseSensitiveRegex\"\xb4\x01\n" +
 	"\x15ErrorCellValueArchive\x12\x1d\n" +
 	"\n" +
-	"error_type\x18\x01 \x02(\x05R\terrorType\x12$\n" +
+	"error_type\x18\x01 \x01(\x05R\terrorType\x12$\n" +
 	"\x0eextra_info_int\x18\x03 \x01(\x05R\fextraInfoInt\x12*\n" +
 	"\x11extra_info_string\x18\x04 \x01(\tR\x0fextraInfoString\x12*\n" +
 	"\x11extra_info_double\x18\x05 \x01(\x01R\x0fextraInfoDouble\"\x81\x04\n" +
 	"\x10CellValueArchive\x12L\n" +
-	"\x0fcell_value_type\x18\x01 \x02(\x0e2$.TSCE.CellValueArchive.CellValueTypeR\rcellValueType\x12B\n" +
+	"\x0fcell_value_type\x18\x01 \x01(\x0e2$.TSCE.CellValueArchive.CellValueTypeR\rcellValueType\x12B\n" +
 	"\rboolean_value\x18\x02 \x01(\v2\x1d.TSCE.BooleanCellValueArchiveR\fbooleanValue\x129\n" +
 	"\n" +
 	"date_value\x18\x03 \x01(\v2\x1a.TSCE.DateCellValueArchiveR\tdateValue\x12?\n" +

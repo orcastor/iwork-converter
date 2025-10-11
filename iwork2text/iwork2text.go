@@ -99,8 +99,16 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive, ocr func(io.Reader) 
 	for _, tinfo := range tm.BaseDataStore.Tiles.Tiles {
 		tile := ctx.ix.Deref(tinfo.Tile).(*TST.Tile)
 		for r, rinfo := range tile.RowInfos {
-			offsets := make([]uint16, len(rinfo.CellOffsets)/2)
-			binary.Read(bytes.NewBuffer(rinfo.CellOffsets), LE, offsets)
+			// Try using cell_offsets first, fallback to cell_offsets_pre_bnc
+			cellOffsets := rinfo.CellOffsets
+			cellStorageBuffer := rinfo.CellStorageBuffer
+			if len(cellOffsets) == 0 && len(rinfo.CellOffsetsPreBnc) > 0 {
+				cellOffsets = rinfo.CellOffsetsPreBnc
+				cellStorageBuffer = rinfo.CellStorageBufferPreBnc
+			}
+
+			offsets := make([]uint16, len(cellOffsets)/2)
+			binary.Read(bytes.NewBuffer(cellOffsets), LE, offsets)
 			// Navely assuming that the index is the column number, per the stringrayreader code.
 			// FIXME - figure out the right way to determine column number.
 			for c, offset := range offsets {
@@ -117,36 +125,36 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive, ocr func(io.Reader) 
 				// this has changed since I first wrote the code.  There is now a 4 in the first byte and the type in the next
 				// the "stingrayreader" site says there is a halfword "version" and then the type, which I think worked at one
 				// point, but I no longer have the file.
-				if rinfo.CellStorageBuffer[offset] == 4 {
-					cellType = int(rinfo.CellStorageBuffer[offset+1])
+				if cellStorageBuffer[offset] == 4 {
+					cellType = int(cellStorageBuffer[offset+1])
 				} else {
-					cellType = int(rinfo.CellStorageBuffer[offset+2])
+					cellType = int(cellStorageBuffer[offset+2])
 				}
 
 				// As far as I can tell, the records are variable length, with the pointer into the string/rich table at
 				// the end, but this field seems to contain one bit per uint32 before the pointer to the string table
 				// I suspect they are flags indicating which numbers/fields follow.
-				flags := LE.Uint16(rinfo.CellStorageBuffer[offset+4 : offset+6])
+				flags := LE.Uint16(cellStorageBuffer[offset+4 : offset+6])
 				o := popcount(flags)*4 + 8 + int(offset)
 
-				key := LE.Uint32(rinfo.CellStorageBuffer[o : o+4])
+				key := LE.Uint32(cellStorageBuffer[o : o+4])
 
-				// fmt.Printf("P %d %x %d %x\n", cellType, flags, popcount(flags), rinfo.CellStorageBuffer[o:o+4])
-				// version := LE.Uint16(rinfo.CellStorageBuffer[offset : offset+2])
-				// fmt.Println("XXX", c, version, cellType, hex.EncodeToString(rinfo.CellStorageBuffer[offset:]))
+				// fmt.Printf("P %d %x %d %x\n", cellType, flags, popcount(flags), cellStorageBuffer[o:o+4])
+				// version := LE.Uint16(cellStorageBuffer[offset : offset+2])
+				// fmt.Println("XXX", c, version, cellType, hex.EncodeToString(cellStorageBuffer[offset:]))
 				switch cellType {
 				case 0:
 					// blank cells are type 0
 				case 2: // number
-					value := math.Float64frombits(LE.Uint64(rinfo.CellStorageBuffer[o : o+8]))
+					value := math.Float64frombits(LE.Uint64(cellStorageBuffer[o : o+8]))
 					doc += " " + fmt.Sprint(value)
 				case 5: // date
-					value := math.Float64frombits(LE.Uint64(rinfo.CellStorageBuffer[o : o+8]))
+					value := math.Float64frombits(LE.Uint64(cellStorageBuffer[o : o+8]))
 					value += 978307200 // Apple to unix epoch
 					tm := time.Unix(int64(value), 0)
 					doc += " " + fmt.Sprint(tm)
 				case 6: // boolean
-					value := math.Float64frombits(LE.Uint64(rinfo.CellStorageBuffer[o : o+8]))
+					value := math.Float64frombits(LE.Uint64(cellStorageBuffer[o : o+8]))
 					label := "???"
 					if value == 0 {
 						label = "FALSE"
@@ -171,8 +179,8 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive, ocr func(io.Reader) 
 						}
 					}
 				default:
-					fmt.Printf("P %d %x %d %x\n", cellType, flags, popcount(flags), rinfo.CellStorageBuffer[o:o+8])
-					fmt.Printf("CELL %d:%d type %d %s\n", r, c, cellType, hex.EncodeToString(rinfo.CellStorageBuffer[offset:]))
+					fmt.Printf("P %d %x %d %x\n", cellType, flags, popcount(flags), cellStorageBuffer[o:o+8])
+					fmt.Printf("CELL %d:%d type %d %s\n", r, c, cellType, hex.EncodeToString(cellStorageBuffer[offset:]))
 				}
 			}
 		}
@@ -360,7 +368,7 @@ func (ctx *Context) processPages(ocr func(io.Reader) (string, error)) string {
 
 	fda := ctx.ix.Deref(da.FloatingDrawables).(*TP.FloatingDrawablesArchive)
 	if len(fda.PageGroups) != 0 {
-		fmt.Println(`WARNING - 
+		fmt.Print(`WARNING - 
             This document has floating drawables (e.g. floating images/tables/text blocks) which we don't handle in HTML
             conversion.
             

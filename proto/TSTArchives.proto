@@ -301,21 +301,21 @@ message HeaderStorage {
 }
 
 message DataStore {
-  required HeaderStorage rowHeaders = 1;
-  required .TSP.Reference columnHeaders = 2;
-  required TileStorage tiles = 3;
-  required .TSP.Reference stringTable = 4;
-  required .TSP.Reference styleTable = 5;
-  required .TSP.Reference formula_table = 6;
+  optional HeaderStorage rowHeaders = 1;
+  optional .TSP.Reference columnHeaders = 2;
+  optional TileStorage tiles = 3;
+  optional .TSP.Reference stringTable = 4;
+  optional .TSP.Reference styleTable = 5;
+  optional .TSP.Reference formula_table = 6;
   optional .TSP.Reference formulaErrorTable = 12;
-  required .TSP.Reference format_table_pre_bnc = 11;
+  optional .TSP.Reference format_table_pre_bnc = 11;
   optional .TSP.Reference multipleChoiceListFormatTable = 16;
   optional .TSP.Reference merge_region_map = 13;
   optional .TSP.Reference deprecated_custom_format_table = 15;
-  required uint32 nextRowStripID = 7;
-  required uint32 nextColumnStripID = 8;
-  required TableRBTree rowTileTree = 9;
-  required TableRBTree columnTileTree = 10;
+  optional uint32 nextRowStripID = 7;
+  optional uint32 nextColumnStripID = 8;
+  optional TableRBTree rowTileTree = 9;
+  optional TableRBTree columnTileTree = 10;
   optional uint32 storage_version_pre_bnc = 14;
   optional .TSP.Reference rich_text_table = 17;
   optional .TSP.Reference conditionalstyletable = 18;
@@ -471,27 +471,27 @@ message StructuredTextImportRecord {
 }
 
 message TableModelArchive {
-  required string table_id = 1;
+  optional string table_id = 1;
   optional string from_table_id = 43;
   optional bool was_cut = 50;
-  required .TSP.Reference table_style = 3;
-  required .TSP.Reference body_text_style = 24;
-  required .TSP.Reference header_row_text_style = 25;
-  required .TSP.Reference header_column_text_style = 26;
-  required .TSP.Reference footer_row_text_style = 27;
-  required .TSP.Reference body_cell_style = 18;
-  required .TSP.Reference header_row_style = 19;
-  required .TSP.Reference header_column_style = 20;
-  required .TSP.Reference footer_row_style = 21;
+  optional .TSP.Reference table_style = 3;
+  optional .TSP.Reference body_text_style = 24;
+  optional .TSP.Reference header_row_text_style = 25;
+  optional .TSP.Reference header_column_text_style = 26;
+  optional .TSP.Reference footer_row_text_style = 27;
+  optional .TSP.Reference body_cell_style = 18;
+  optional .TSP.Reference header_row_style = 19;
+  optional .TSP.Reference header_column_style = 20;
+  optional .TSP.Reference footer_row_style = 21;
   optional .TSP.Reference table_name_style = 30;
   optional .TSP.Reference table_name_shape_style = 36;
   optional .TSP.Reference table_style_preset = 48;
   optional uint32 preset_index = 28;
-  required DataStore base_data_store = 4;
+  optional DataStore base_data_store = 4;
   optional .TSP.Reference provider = 5;
-  required uint32 number_of_rows = 6;
-  required uint32 number_of_columns = 7;
-  required string table_name = 8;
+  optional uint32 number_of_rows = 6;
+  optional uint32 number_of_columns = 7;
+  optional string table_name = 8;
   optional bool table_name_enabled = 22;
   optional double table_name_height = 33;
   optional bool table_name_border_enabled = 37;
@@ -505,8 +505,8 @@ message TableModelArchive {
   optional uint32 number_of_user_hidden_rows = 41;
   optional uint32 number_of_user_hidden_columns = 42;
   optional uint32 number_of_filtered_rows = 40;
-  required double default_row_height = 16;
-  required double default_column_width = 17;
+  optional double default_row_height = 16;
+  optional double default_column_width = 17;
   optional CellID origin_offset = 23;
   optional bool repeating_header_rows_enabled = 29;
   optional bool style_apply_clears_all = 31;
@@ -857,7 +857,7 @@ message FilterRuleArchive {
 }
 
 message TableStyleArchive {
-  required .TSS.StyleArchive super = 1;
+  optional .TSS.StyleArchive super = 1;
   optional uint32 override_count = 10 [default = 0];
   optional TableStylePropertiesArchive table_properties = 11;
 }

@@ -502,8 +502,8 @@ func (x *SparseReferenceArray) GetEntries() []*SparseReferenceArray_Entry {
 
 type Point struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	X             *float32               `protobuf:"fixed32,1,req,name=x" json:"x,omitempty"`
-	Y             *float32               `protobuf:"fixed32,2,req,name=y" json:"y,omitempty"`
+	X             *float32               `protobuf:"fixed32,1,opt,name=x" json:"x,omitempty"`
+	Y             *float32               `protobuf:"fixed32,2,opt,name=y" json:"y,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2889,8 +2889,8 @@ const file_TSPMessages_proto_rawDesc = "" +
 	"\x05index\x18\x01 \x02(\rR\x05index\x12,\n" +
 	"\treference\x18\x02 \x02(\v2\x0e.TSP.ReferenceR\treference\"#\n" +
 	"\x05Point\x12\f\n" +
-	"\x01x\x18\x01 \x02(\x02R\x01x\x12\f\n" +
-	"\x01y\x18\x02 \x02(\x02R\x01y\"D\n" +
+	"\x01x\x18\x01 \x01(\x02R\x01x\x12\f\n" +
+	"\x01y\x18\x02 \x01(\x02R\x01y\"D\n" +
 	"\x06Pose3D\x12\x10\n" +
 	"\x03yaw\x18\x01 \x02(\x02R\x03yaw\x12\x14\n" +
 	"\x05pitch\x18\x02 \x02(\x02R\x05pitch\x12\x12\n" +

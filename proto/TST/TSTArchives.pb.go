@@ -2563,21 +2563,21 @@ func (x *HeaderStorage) GetBuckets() []*TSP.Reference {
 
 type DataStore struct {
 	state                         protoimpl.MessageState `protogen:"open.v1"`
-	RowHeaders                    *HeaderStorage         `protobuf:"bytes,1,req,name=rowHeaders" json:"rowHeaders,omitempty"`
-	ColumnHeaders                 *TSP.Reference         `protobuf:"bytes,2,req,name=columnHeaders" json:"columnHeaders,omitempty"`
-	Tiles                         *TileStorage           `protobuf:"bytes,3,req,name=tiles" json:"tiles,omitempty"`
-	StringTable                   *TSP.Reference         `protobuf:"bytes,4,req,name=stringTable" json:"stringTable,omitempty"`
-	StyleTable                    *TSP.Reference         `protobuf:"bytes,5,req,name=styleTable" json:"styleTable,omitempty"`
-	FormulaTable                  *TSP.Reference         `protobuf:"bytes,6,req,name=formula_table,json=formulaTable" json:"formula_table,omitempty"`
+	RowHeaders                    *HeaderStorage         `protobuf:"bytes,1,opt,name=rowHeaders" json:"rowHeaders,omitempty"`
+	ColumnHeaders                 *TSP.Reference         `protobuf:"bytes,2,opt,name=columnHeaders" json:"columnHeaders,omitempty"`
+	Tiles                         *TileStorage           `protobuf:"bytes,3,opt,name=tiles" json:"tiles,omitempty"`
+	StringTable                   *TSP.Reference         `protobuf:"bytes,4,opt,name=stringTable" json:"stringTable,omitempty"`
+	StyleTable                    *TSP.Reference         `protobuf:"bytes,5,opt,name=styleTable" json:"styleTable,omitempty"`
+	FormulaTable                  *TSP.Reference         `protobuf:"bytes,6,opt,name=formula_table,json=formulaTable" json:"formula_table,omitempty"`
 	FormulaErrorTable             *TSP.Reference         `protobuf:"bytes,12,opt,name=formulaErrorTable" json:"formulaErrorTable,omitempty"`
-	FormatTablePreBnc             *TSP.Reference         `protobuf:"bytes,11,req,name=format_table_pre_bnc,json=formatTablePreBnc" json:"format_table_pre_bnc,omitempty"`
+	FormatTablePreBnc             *TSP.Reference         `protobuf:"bytes,11,opt,name=format_table_pre_bnc,json=formatTablePreBnc" json:"format_table_pre_bnc,omitempty"`
 	MultipleChoiceListFormatTable *TSP.Reference         `protobuf:"bytes,16,opt,name=multipleChoiceListFormatTable" json:"multipleChoiceListFormatTable,omitempty"`
 	MergeRegionMap                *TSP.Reference         `protobuf:"bytes,13,opt,name=merge_region_map,json=mergeRegionMap" json:"merge_region_map,omitempty"`
 	DeprecatedCustomFormatTable   *TSP.Reference         `protobuf:"bytes,15,opt,name=deprecated_custom_format_table,json=deprecatedCustomFormatTable" json:"deprecated_custom_format_table,omitempty"`
-	NextRowStripID                *uint32                `protobuf:"varint,7,req,name=nextRowStripID" json:"nextRowStripID,omitempty"`
-	NextColumnStripID             *uint32                `protobuf:"varint,8,req,name=nextColumnStripID" json:"nextColumnStripID,omitempty"`
-	RowTileTree                   *TableRBTree           `protobuf:"bytes,9,req,name=rowTileTree" json:"rowTileTree,omitempty"`
-	ColumnTileTree                *TableRBTree           `protobuf:"bytes,10,req,name=columnTileTree" json:"columnTileTree,omitempty"`
+	NextRowStripID                *uint32                `protobuf:"varint,7,opt,name=nextRowStripID" json:"nextRowStripID,omitempty"`
+	NextColumnStripID             *uint32                `protobuf:"varint,8,opt,name=nextColumnStripID" json:"nextColumnStripID,omitempty"`
+	RowTileTree                   *TableRBTree           `protobuf:"bytes,9,opt,name=rowTileTree" json:"rowTileTree,omitempty"`
+	ColumnTileTree                *TableRBTree           `protobuf:"bytes,10,opt,name=columnTileTree" json:"columnTileTree,omitempty"`
 	StorageVersionPreBnc          *uint32                `protobuf:"varint,14,opt,name=storage_version_pre_bnc,json=storageVersionPreBnc" json:"storage_version_pre_bnc,omitempty"`
 	RichTextTable                 *TSP.Reference         `protobuf:"bytes,17,opt,name=rich_text_table,json=richTextTable" json:"rich_text_table,omitempty"`
 	Conditionalstyletable         *TSP.Reference         `protobuf:"bytes,18,opt,name=conditionalstyletable" json:"conditionalstyletable,omitempty"`
@@ -3739,27 +3739,27 @@ func (x *StructuredTextImportRecord) GetSourceColumnCount() uint64 {
 
 type TableModelArchive struct {
 	state                             protoimpl.MessageState           `protogen:"open.v1"`
-	TableId                           *string                          `protobuf:"bytes,1,req,name=table_id,json=tableId" json:"table_id,omitempty"`
+	TableId                           *string                          `protobuf:"bytes,1,opt,name=table_id,json=tableId" json:"table_id,omitempty"`
 	FromTableId                       *string                          `protobuf:"bytes,43,opt,name=from_table_id,json=fromTableId" json:"from_table_id,omitempty"`
 	WasCut                            *bool                            `protobuf:"varint,50,opt,name=was_cut,json=wasCut" json:"was_cut,omitempty"`
-	TableStyle                        *TSP.Reference                   `protobuf:"bytes,3,req,name=table_style,json=tableStyle" json:"table_style,omitempty"`
-	BodyTextStyle                     *TSP.Reference                   `protobuf:"bytes,24,req,name=body_text_style,json=bodyTextStyle" json:"body_text_style,omitempty"`
-	HeaderRowTextStyle                *TSP.Reference                   `protobuf:"bytes,25,req,name=header_row_text_style,json=headerRowTextStyle" json:"header_row_text_style,omitempty"`
-	HeaderColumnTextStyle             *TSP.Reference                   `protobuf:"bytes,26,req,name=header_column_text_style,json=headerColumnTextStyle" json:"header_column_text_style,omitempty"`
-	FooterRowTextStyle                *TSP.Reference                   `protobuf:"bytes,27,req,name=footer_row_text_style,json=footerRowTextStyle" json:"footer_row_text_style,omitempty"`
-	BodyCellStyle                     *TSP.Reference                   `protobuf:"bytes,18,req,name=body_cell_style,json=bodyCellStyle" json:"body_cell_style,omitempty"`
-	HeaderRowStyle                    *TSP.Reference                   `protobuf:"bytes,19,req,name=header_row_style,json=headerRowStyle" json:"header_row_style,omitempty"`
-	HeaderColumnStyle                 *TSP.Reference                   `protobuf:"bytes,20,req,name=header_column_style,json=headerColumnStyle" json:"header_column_style,omitempty"`
-	FooterRowStyle                    *TSP.Reference                   `protobuf:"bytes,21,req,name=footer_row_style,json=footerRowStyle" json:"footer_row_style,omitempty"`
+	TableStyle                        *TSP.Reference                   `protobuf:"bytes,3,opt,name=table_style,json=tableStyle" json:"table_style,omitempty"`
+	BodyTextStyle                     *TSP.Reference                   `protobuf:"bytes,24,opt,name=body_text_style,json=bodyTextStyle" json:"body_text_style,omitempty"`
+	HeaderRowTextStyle                *TSP.Reference                   `protobuf:"bytes,25,opt,name=header_row_text_style,json=headerRowTextStyle" json:"header_row_text_style,omitempty"`
+	HeaderColumnTextStyle             *TSP.Reference                   `protobuf:"bytes,26,opt,name=header_column_text_style,json=headerColumnTextStyle" json:"header_column_text_style,omitempty"`
+	FooterRowTextStyle                *TSP.Reference                   `protobuf:"bytes,27,opt,name=footer_row_text_style,json=footerRowTextStyle" json:"footer_row_text_style,omitempty"`
+	BodyCellStyle                     *TSP.Reference                   `protobuf:"bytes,18,opt,name=body_cell_style,json=bodyCellStyle" json:"body_cell_style,omitempty"`
+	HeaderRowStyle                    *TSP.Reference                   `protobuf:"bytes,19,opt,name=header_row_style,json=headerRowStyle" json:"header_row_style,omitempty"`
+	HeaderColumnStyle                 *TSP.Reference                   `protobuf:"bytes,20,opt,name=header_column_style,json=headerColumnStyle" json:"header_column_style,omitempty"`
+	FooterRowStyle                    *TSP.Reference                   `protobuf:"bytes,21,opt,name=footer_row_style,json=footerRowStyle" json:"footer_row_style,omitempty"`
 	TableNameStyle                    *TSP.Reference                   `protobuf:"bytes,30,opt,name=table_name_style,json=tableNameStyle" json:"table_name_style,omitempty"`
 	TableNameShapeStyle               *TSP.Reference                   `protobuf:"bytes,36,opt,name=table_name_shape_style,json=tableNameShapeStyle" json:"table_name_shape_style,omitempty"`
 	TableStylePreset                  *TSP.Reference                   `protobuf:"bytes,48,opt,name=table_style_preset,json=tableStylePreset" json:"table_style_preset,omitempty"`
 	PresetIndex                       *uint32                          `protobuf:"varint,28,opt,name=preset_index,json=presetIndex" json:"preset_index,omitempty"`
-	BaseDataStore                     *DataStore                       `protobuf:"bytes,4,req,name=base_data_store,json=baseDataStore" json:"base_data_store,omitempty"`
+	BaseDataStore                     *DataStore                       `protobuf:"bytes,4,opt,name=base_data_store,json=baseDataStore" json:"base_data_store,omitempty"`
 	Provider                          *TSP.Reference                   `protobuf:"bytes,5,opt,name=provider" json:"provider,omitempty"`
-	NumberOfRows                      *uint32                          `protobuf:"varint,6,req,name=number_of_rows,json=numberOfRows" json:"number_of_rows,omitempty"`
-	NumberOfColumns                   *uint32                          `protobuf:"varint,7,req,name=number_of_columns,json=numberOfColumns" json:"number_of_columns,omitempty"`
-	TableName                         *string                          `protobuf:"bytes,8,req,name=table_name,json=tableName" json:"table_name,omitempty"`
+	NumberOfRows                      *uint32                          `protobuf:"varint,6,opt,name=number_of_rows,json=numberOfRows" json:"number_of_rows,omitempty"`
+	NumberOfColumns                   *uint32                          `protobuf:"varint,7,opt,name=number_of_columns,json=numberOfColumns" json:"number_of_columns,omitempty"`
+	TableName                         *string                          `protobuf:"bytes,8,opt,name=table_name,json=tableName" json:"table_name,omitempty"`
 	TableNameEnabled                  *bool                            `protobuf:"varint,22,opt,name=table_name_enabled,json=tableNameEnabled" json:"table_name_enabled,omitempty"`
 	TableNameHeight                   *float64                         `protobuf:"fixed64,33,opt,name=table_name_height,json=tableNameHeight" json:"table_name_height,omitempty"`
 	TableNameBorderEnabled            *bool                            `protobuf:"varint,37,opt,name=table_name_border_enabled,json=tableNameBorderEnabled" json:"table_name_border_enabled,omitempty"`
@@ -3773,8 +3773,8 @@ type TableModelArchive struct {
 	NumberOfUserHiddenRows            *uint32                          `protobuf:"varint,41,opt,name=number_of_user_hidden_rows,json=numberOfUserHiddenRows" json:"number_of_user_hidden_rows,omitempty"`
 	NumberOfUserHiddenColumns         *uint32                          `protobuf:"varint,42,opt,name=number_of_user_hidden_columns,json=numberOfUserHiddenColumns" json:"number_of_user_hidden_columns,omitempty"`
 	NumberOfFilteredRows              *uint32                          `protobuf:"varint,40,opt,name=number_of_filtered_rows,json=numberOfFilteredRows" json:"number_of_filtered_rows,omitempty"`
-	DefaultRowHeight                  *float64                         `protobuf:"fixed64,16,req,name=default_row_height,json=defaultRowHeight" json:"default_row_height,omitempty"`
-	DefaultColumnWidth                *float64                         `protobuf:"fixed64,17,req,name=default_column_width,json=defaultColumnWidth" json:"default_column_width,omitempty"`
+	DefaultRowHeight                  *float64                         `protobuf:"fixed64,16,opt,name=default_row_height,json=defaultRowHeight" json:"default_row_height,omitempty"`
+	DefaultColumnWidth                *float64                         `protobuf:"fixed64,17,opt,name=default_column_width,json=defaultColumnWidth" json:"default_column_width,omitempty"`
 	OriginOffset                      *CellID                          `protobuf:"bytes,23,opt,name=origin_offset,json=originOffset" json:"origin_offset,omitempty"`
 	RepeatingHeaderRowsEnabled        *bool                            `protobuf:"varint,29,opt,name=repeating_header_rows_enabled,json=repeatingHeaderRowsEnabled" json:"repeating_header_rows_enabled,omitempty"`
 	StyleApplyClearsAll               *bool                            `protobuf:"varint,31,opt,name=style_apply_clears_all,json=styleApplyClearsAll" json:"style_apply_clears_all,omitempty"`
@@ -6968,7 +6968,7 @@ func (x *FilterRuleArchive) GetPredicate() *FormulaPredicateArchive {
 
 type TableStyleArchive struct {
 	state           protoimpl.MessageState       `protogen:"open.v1"`
-	Super           *TSS.StyleArchive            `protobuf:"bytes,1,req,name=super" json:"super,omitempty"`
+	Super           *TSS.StyleArchive            `protobuf:"bytes,1,opt,name=super" json:"super,omitempty"`
 	OverrideCount   *uint32                      `protobuf:"varint,10,opt,name=override_count,json=overrideCount,def=0" json:"override_count,omitempty"`
 	TableProperties *TableStylePropertiesArchive `protobuf:"bytes,11,opt,name=table_properties,json=tableProperties" json:"table_properties,omitempty"`
 	unknownFields   protoimpl.UnknownFields
@@ -14032,25 +14032,25 @@ const file_TSTArchives_proto_rawDesc = "" +
 	"\n" +
 	"\tDataStore\x122\n" +
 	"\n" +
-	"rowHeaders\x18\x01 \x02(\v2\x12.TST.HeaderStorageR\n" +
+	"rowHeaders\x18\x01 \x01(\v2\x12.TST.HeaderStorageR\n" +
 	"rowHeaders\x124\n" +
-	"\rcolumnHeaders\x18\x02 \x02(\v2\x0e.TSP.ReferenceR\rcolumnHeaders\x12&\n" +
-	"\x05tiles\x18\x03 \x02(\v2\x10.TST.TileStorageR\x05tiles\x120\n" +
-	"\vstringTable\x18\x04 \x02(\v2\x0e.TSP.ReferenceR\vstringTable\x12.\n" +
+	"\rcolumnHeaders\x18\x02 \x01(\v2\x0e.TSP.ReferenceR\rcolumnHeaders\x12&\n" +
+	"\x05tiles\x18\x03 \x01(\v2\x10.TST.TileStorageR\x05tiles\x120\n" +
+	"\vstringTable\x18\x04 \x01(\v2\x0e.TSP.ReferenceR\vstringTable\x12.\n" +
 	"\n" +
-	"styleTable\x18\x05 \x02(\v2\x0e.TSP.ReferenceR\n" +
+	"styleTable\x18\x05 \x01(\v2\x0e.TSP.ReferenceR\n" +
 	"styleTable\x123\n" +
-	"\rformula_table\x18\x06 \x02(\v2\x0e.TSP.ReferenceR\fformulaTable\x12<\n" +
+	"\rformula_table\x18\x06 \x01(\v2\x0e.TSP.ReferenceR\fformulaTable\x12<\n" +
 	"\x11formulaErrorTable\x18\f \x01(\v2\x0e.TSP.ReferenceR\x11formulaErrorTable\x12?\n" +
-	"\x14format_table_pre_bnc\x18\v \x02(\v2\x0e.TSP.ReferenceR\x11formatTablePreBnc\x12T\n" +
+	"\x14format_table_pre_bnc\x18\v \x01(\v2\x0e.TSP.ReferenceR\x11formatTablePreBnc\x12T\n" +
 	"\x1dmultipleChoiceListFormatTable\x18\x10 \x01(\v2\x0e.TSP.ReferenceR\x1dmultipleChoiceListFormatTable\x128\n" +
 	"\x10merge_region_map\x18\r \x01(\v2\x0e.TSP.ReferenceR\x0emergeRegionMap\x12S\n" +
 	"\x1edeprecated_custom_format_table\x18\x0f \x01(\v2\x0e.TSP.ReferenceR\x1bdeprecatedCustomFormatTable\x12&\n" +
-	"\x0enextRowStripID\x18\a \x02(\rR\x0enextRowStripID\x12,\n" +
-	"\x11nextColumnStripID\x18\b \x02(\rR\x11nextColumnStripID\x122\n" +
-	"\vrowTileTree\x18\t \x02(\v2\x10.TST.TableRBTreeR\vrowTileTree\x128\n" +
+	"\x0enextRowStripID\x18\a \x01(\rR\x0enextRowStripID\x12,\n" +
+	"\x11nextColumnStripID\x18\b \x01(\rR\x11nextColumnStripID\x122\n" +
+	"\vrowTileTree\x18\t \x01(\v2\x10.TST.TableRBTreeR\vrowTileTree\x128\n" +
 	"\x0ecolumnTileTree\x18\n" +
-	" \x02(\v2\x10.TST.TableRBTreeR\x0ecolumnTileTree\x125\n" +
+	" \x01(\v2\x10.TST.TableRBTreeR\x0ecolumnTileTree\x125\n" +
 	"\x17storage_version_pre_bnc\x18\x0e \x01(\rR\x14storageVersionPreBnc\x126\n" +
 	"\x0frich_text_table\x18\x11 \x01(\v2\x0e.TSP.ReferenceR\rrichTextTable\x12D\n" +
 	"\x15conditionalstyletable\x18\x12 \x01(\v2\x0e.TSP.ReferenceR\x15conditionalstyletable\x12@\n" +
@@ -14185,29 +14185,29 @@ const file_TSTArchives_proto_rawDesc = "" +
 	"\x10source_row_count\x18\b \x01(\x04R\x0esourceRowCount\x12.\n" +
 	"\x13source_column_count\x18\t \x01(\x04R\x11sourceColumnCount\"\xa1)\n" +
 	"\x11TableModelArchive\x12\x19\n" +
-	"\btable_id\x18\x01 \x02(\tR\atableId\x12\"\n" +
+	"\btable_id\x18\x01 \x01(\tR\atableId\x12\"\n" +
 	"\rfrom_table_id\x18+ \x01(\tR\vfromTableId\x12\x17\n" +
 	"\awas_cut\x182 \x01(\bR\x06wasCut\x12/\n" +
-	"\vtable_style\x18\x03 \x02(\v2\x0e.TSP.ReferenceR\n" +
+	"\vtable_style\x18\x03 \x01(\v2\x0e.TSP.ReferenceR\n" +
 	"tableStyle\x126\n" +
-	"\x0fbody_text_style\x18\x18 \x02(\v2\x0e.TSP.ReferenceR\rbodyTextStyle\x12A\n" +
-	"\x15header_row_text_style\x18\x19 \x02(\v2\x0e.TSP.ReferenceR\x12headerRowTextStyle\x12G\n" +
-	"\x18header_column_text_style\x18\x1a \x02(\v2\x0e.TSP.ReferenceR\x15headerColumnTextStyle\x12A\n" +
-	"\x15footer_row_text_style\x18\x1b \x02(\v2\x0e.TSP.ReferenceR\x12footerRowTextStyle\x126\n" +
-	"\x0fbody_cell_style\x18\x12 \x02(\v2\x0e.TSP.ReferenceR\rbodyCellStyle\x128\n" +
-	"\x10header_row_style\x18\x13 \x02(\v2\x0e.TSP.ReferenceR\x0eheaderRowStyle\x12>\n" +
-	"\x13header_column_style\x18\x14 \x02(\v2\x0e.TSP.ReferenceR\x11headerColumnStyle\x128\n" +
-	"\x10footer_row_style\x18\x15 \x02(\v2\x0e.TSP.ReferenceR\x0efooterRowStyle\x128\n" +
+	"\x0fbody_text_style\x18\x18 \x01(\v2\x0e.TSP.ReferenceR\rbodyTextStyle\x12A\n" +
+	"\x15header_row_text_style\x18\x19 \x01(\v2\x0e.TSP.ReferenceR\x12headerRowTextStyle\x12G\n" +
+	"\x18header_column_text_style\x18\x1a \x01(\v2\x0e.TSP.ReferenceR\x15headerColumnTextStyle\x12A\n" +
+	"\x15footer_row_text_style\x18\x1b \x01(\v2\x0e.TSP.ReferenceR\x12footerRowTextStyle\x126\n" +
+	"\x0fbody_cell_style\x18\x12 \x01(\v2\x0e.TSP.ReferenceR\rbodyCellStyle\x128\n" +
+	"\x10header_row_style\x18\x13 \x01(\v2\x0e.TSP.ReferenceR\x0eheaderRowStyle\x12>\n" +
+	"\x13header_column_style\x18\x14 \x01(\v2\x0e.TSP.ReferenceR\x11headerColumnStyle\x128\n" +
+	"\x10footer_row_style\x18\x15 \x01(\v2\x0e.TSP.ReferenceR\x0efooterRowStyle\x128\n" +
 	"\x10table_name_style\x18\x1e \x01(\v2\x0e.TSP.ReferenceR\x0etableNameStyle\x12C\n" +
 	"\x16table_name_shape_style\x18$ \x01(\v2\x0e.TSP.ReferenceR\x13tableNameShapeStyle\x12<\n" +
 	"\x12table_style_preset\x180 \x01(\v2\x0e.TSP.ReferenceR\x10tableStylePreset\x12!\n" +
 	"\fpreset_index\x18\x1c \x01(\rR\vpresetIndex\x126\n" +
-	"\x0fbase_data_store\x18\x04 \x02(\v2\x0e.TST.DataStoreR\rbaseDataStore\x12*\n" +
+	"\x0fbase_data_store\x18\x04 \x01(\v2\x0e.TST.DataStoreR\rbaseDataStore\x12*\n" +
 	"\bprovider\x18\x05 \x01(\v2\x0e.TSP.ReferenceR\bprovider\x12$\n" +
-	"\x0enumber_of_rows\x18\x06 \x02(\rR\fnumberOfRows\x12*\n" +
-	"\x11number_of_columns\x18\a \x02(\rR\x0fnumberOfColumns\x12\x1d\n" +
+	"\x0enumber_of_rows\x18\x06 \x01(\rR\fnumberOfRows\x12*\n" +
+	"\x11number_of_columns\x18\a \x01(\rR\x0fnumberOfColumns\x12\x1d\n" +
 	"\n" +
-	"table_name\x18\b \x02(\tR\ttableName\x12,\n" +
+	"table_name\x18\b \x01(\tR\ttableName\x12,\n" +
 	"\x12table_name_enabled\x18\x16 \x01(\bR\x10tableNameEnabled\x12*\n" +
 	"\x11table_name_height\x18! \x01(\x01R\x0ftableNameHeight\x129\n" +
 	"\x19table_name_border_enabled\x18% \x01(\bR\x16tableNameBorderEnabled\x121\n" +
@@ -14222,8 +14222,8 @@ const file_TSTArchives_proto_rawDesc = "" +
 	"\x1anumber_of_user_hidden_rows\x18) \x01(\rR\x16numberOfUserHiddenRows\x12@\n" +
 	"\x1dnumber_of_user_hidden_columns\x18* \x01(\rR\x19numberOfUserHiddenColumns\x125\n" +
 	"\x17number_of_filtered_rows\x18( \x01(\rR\x14numberOfFilteredRows\x12,\n" +
-	"\x12default_row_height\x18\x10 \x02(\x01R\x10defaultRowHeight\x120\n" +
-	"\x14default_column_width\x18\x11 \x02(\x01R\x12defaultColumnWidth\x120\n" +
+	"\x12default_row_height\x18\x10 \x01(\x01R\x10defaultRowHeight\x120\n" +
+	"\x14default_column_width\x18\x11 \x01(\x01R\x12defaultColumnWidth\x120\n" +
 	"\rorigin_offset\x18\x17 \x01(\v2\v.TST.CellIDR\foriginOffset\x12A\n" +
 	"\x1drepeating_header_rows_enabled\x18\x1d \x01(\bR\x1arepeatingHeaderRowsEnabled\x123\n" +
 	"\x16style_apply_clears_all\x18\x1f \x01(\bR\x13styleApplyClearsAll\x12G\n" +
@@ -14532,7 +14532,7 @@ const file_TSTArchives_proto_rawDesc = "" +
 	"\x11FilterRuleArchive\x12:\n" +
 	"\tpredicate\x18\x01 \x02(\v2\x1c.TST.FormulaPredicateArchiveR\tpredicate\"\xb3\x01\n" +
 	"\x11TableStyleArchive\x12'\n" +
-	"\x05super\x18\x01 \x02(\v2\x11.TSS.StyleArchiveR\x05super\x12(\n" +
+	"\x05super\x18\x01 \x01(\v2\x11.TSS.StyleArchiveR\x05super\x12(\n" +
 	"\x0eoverride_count\x18\n" +
 	" \x01(\r:\x010R\roverrideCount\x12K\n" +
 	"\x10table_properties\x18\v \x01(\v2 .TST.TableStylePropertiesArchiveR\x0ftableProperties\"\xaf\x01\n" +
