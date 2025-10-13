@@ -347,6 +347,7 @@
 	"6316": "TST.DataStore",
 	"6317": "TST.TableStyleArchive",
 	"6318": "TST.TableModelArchive",
+	"6365": "TST.ControlCellSelectionArchive",
 	"6366": "TST.TableModelArchive",
 	"6372": "TST.TableStyleArchive",
 	"6373": "TST.TableStyleArchive",
@@ -364,5 +365,7 @@
 	"222": "TSP.Reference",
 	"219": "TSP.Reference",
 	"3091": "TSP.Reference",
-	"5030": "TSP.Reference"
+	"5030": "TSP.Reference",
+	"0": "TSP.Reference",
+	"12050": "TSCH.ChartArchive"
 }

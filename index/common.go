@@ -21,6 +21,11 @@ import (
 func decodeCommon(typ uint32, payload []byte) (interface{}, error) {
 	switch typ {
 
+	case 0:
+		var value = &TSP.Reference{}
+		err := proto.Unmarshal(payload, value)
+		return value, err
+
 	case 10016:
 		var value = &TP.SectionTemplateArchive{}
 		err := proto.Unmarshal(payload, value)
@@ -68,6 +73,11 @@ func decodeCommon(typ uint32, payload []byte) (interface{}, error) {
 
 	case 11015:
 		var value = &TSP.Reference{}
+		err := proto.Unmarshal(payload, value)
+		return value, err
+
+	case 12050:
+		var value = &TSCH.ChartArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
@@ -1828,6 +1838,11 @@ func decodeCommon(typ uint32, payload []byte) (interface{}, error) {
 
 	case 6318:
 		var value = &TST.TableModelArchive{}
+		err := proto.Unmarshal(payload, value)
+		return value, err
+
+	case 6365:
+		var value = &TST.ControlCellSelectionArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
