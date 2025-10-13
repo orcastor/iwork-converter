@@ -13,10 +13,10 @@ message InducedVerifyDocumentWithServerCommandArchive {
 }
 
 message InducedVerifyDrawableZOrdersWithServerCommandArchive {
-  required .TSASOS.InducedVerifyDrawableZOrdersWithServerCommandArchive super = 1;
+  required .TSA.InducedVerifyDrawableZOrdersWithServerCommandArchive super = 1;
 }
 
 message ReapplyPageTemplateCommandArchive {
-  required .TSASOS.CommandReapplyMasterArchive super = 1;
+  required .TSA.CommandReapplyMasterArchive super = 1;
 }
 

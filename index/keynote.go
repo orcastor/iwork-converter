@@ -3,6 +3,7 @@ package index
 import (
 	"github.com/golang/protobuf/proto"
 	"github.com/orcastor/iwork-converter/proto/KN"
+	"github.com/orcastor/iwork-converter/proto/TSP"
 	"github.com/orcastor/iwork-converter/proto/TSWP"
 )
 
@@ -274,6 +275,16 @@ func decodeKeynote(typ uint32, payload []byte) (interface{}, error) {
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
+	case 184:
+		var value = &TSP.Reference{}
+		err := proto.Unmarshal(payload, value)
+		return value, err
+
+	case 185:
+		var value = &TSP.Reference{}
+		err := proto.Unmarshal(payload, value)
+		return value, err
+
 	case 19:
 		var value = &KN.ClassicStylesheetRecordArchive{}
 		err := proto.Unmarshal(payload, value)
@@ -311,6 +322,11 @@ func decodeKeynote(typ uint32, payload []byte) (interface{}, error) {
 
 	case 25:
 		var value = &KN.SlideCollectionSelectionArchive{}
+		err := proto.Unmarshal(payload, value)
+		return value, err
+
+	case 26:
+		var value = &TSP.Reference{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 

@@ -33,7 +33,7 @@ type ChartInfoArchive struct {
 	Style                               *TSP.Reference            `protobuf:"bytes,3,opt,name=style" json:"style,omitempty"`
 	ChartType                           *TSCH.ChartType           `protobuf:"varint,4,req,name=chart_type,json=chartType,enum=TSCH.ChartType" json:"chart_type,omitempty"`
 	LegendModel                         *LegendModelArchive       `protobuf:"bytes,5,opt,name=legend_model,json=legendModel" json:"legend_model,omitempty"`
-	InnerChartFrame                     *TSCH.RectArchive         `protobuf:"bytes,6,req,name=inner_chart_frame,json=innerChartFrame" json:"inner_chart_frame,omitempty"`
+	InnerChartFrame                     *TSCH.RectArchive         `protobuf:"bytes,6,opt,name=inner_chart_frame,json=innerChartFrame" json:"inner_chart_frame,omitempty"`
 	ValueAxisStyles                     []*TSP.Reference          `protobuf:"bytes,7,rep,name=value_axis_styles,json=valueAxisStyles" json:"value_axis_styles,omitempty"`
 	CategoryAxisStyles                  []*TSP.Reference          `protobuf:"bytes,8,rep,name=category_axis_styles,json=categoryAxisStyles" json:"category_axis_styles,omitempty"`
 	ValueAxisNonstyles                  []*TSP.Reference          `protobuf:"bytes,9,rep,name=value_axis_nonstyles,json=valueAxisNonstyles" json:"value_axis_nonstyles,omitempty"`
@@ -241,7 +241,7 @@ func (x *ChartInfoArchive) GetNeedsCalcEngineDeferredImportAction() bool {
 type LegendModelArchive struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Info          *TSP.Reference         `protobuf:"bytes,1,opt,name=info" json:"info,omitempty"`
-	Frame         *TSCH.RectArchive      `protobuf:"bytes,2,req,name=frame" json:"frame,omitempty"`
+	Frame         *TSCH.RectArchive      `protobuf:"bytes,2,opt,name=frame" json:"frame,omitempty"`
 	Style         *TSP.Reference         `protobuf:"bytes,3,req,name=style" json:"style,omitempty"`
 	NonStyle      *TSP.Reference         `protobuf:"bytes,4,req,name=non_style,json=nonStyle" json:"non_style,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -3448,7 +3448,7 @@ const file_TSCHPreUFFArchives_proto_rawDesc = "" +
 	"\n" +
 	"chart_type\x18\x04 \x02(\x0e2\x0f.TSCH.ChartTypeR\tchartType\x12B\n" +
 	"\flegend_model\x18\x05 \x01(\v2\x1f.TSCH.PreUFF.LegendModelArchiveR\vlegendModel\x12=\n" +
-	"\x11inner_chart_frame\x18\x06 \x02(\v2\x11.TSCH.RectArchiveR\x0finnerChartFrame\x12:\n" +
+	"\x11inner_chart_frame\x18\x06 \x01(\v2\x11.TSCH.RectArchiveR\x0finnerChartFrame\x12:\n" +
 	"\x11value_axis_styles\x18\a \x03(\v2\x0e.TSP.ReferenceR\x0fvalueAxisStyles\x12@\n" +
 	"\x14category_axis_styles\x18\b \x03(\v2\x0e.TSP.ReferenceR\x12categoryAxisStyles\x12@\n" +
 	"\x14value_axis_nonstyles\x18\t \x03(\v2\x0e.TSP.ReferenceR\x12valueAxisNonstyles\x12F\n" +
@@ -3469,7 +3469,7 @@ const file_TSCHPreUFFArchives_proto_rawDesc = "" +
 	"(needs_calc_engine_deferred_import_action\x18\x16 \x01(\bR#needsCalcEngineDeferredImportAction\"\xb4\x01\n" +
 	"\x12LegendModelArchive\x12\"\n" +
 	"\x04info\x18\x01 \x01(\v2\x0e.TSP.ReferenceR\x04info\x12'\n" +
-	"\x05frame\x18\x02 \x02(\v2\x11.TSCH.RectArchiveR\x05frame\x12$\n" +
+	"\x05frame\x18\x02 \x01(\v2\x11.TSCH.RectArchiveR\x05frame\x12$\n" +
 	"\x05style\x18\x03 \x02(\v2\x0e.TSP.ReferenceR\x05style\x12+\n" +
 	"\tnon_style\x18\x04 \x02(\v2\x0e.TSP.ReferenceR\bnonStyle\"\x94\x02\n" +
 	"\x11ChartModelArchive\x12\"\n" +

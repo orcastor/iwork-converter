@@ -23,6 +23,7 @@
 	"23": "KN.DesktopUILayoutArchive",
 	"24": "KN.CanvasSelectionArchive",
 	"25": "KN.SlideCollectionSelectionArchive",
+	"26": "TSP.Reference",
 	"100": "KN.SlideArchive",
 	"101": "KN.SlideArchive",
 	"102": "KN.SlideArchive",
@@ -66,5 +67,7 @@
 	"146": "KN.SlideArchive",
 	"147": "KN.SlideArchive",
 	"148": "KN.SlideArchive",
+	"184": "TSP.Reference",
+	"185": "TSP.Reference",
 	"10011": "TSWP.SectionPlaceholderArchive"
 }

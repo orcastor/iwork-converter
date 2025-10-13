@@ -567,7 +567,7 @@ func (FractionAccuracy) EnumDescriptor() ([]byte, []int) {
 type RectArchive struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Origin        *TSP.Point             `protobuf:"bytes,1,req,name=origin" json:"origin,omitempty"`
-	Size          *TSP.Size              `protobuf:"bytes,2,req,name=size" json:"size,omitempty"`
+	Size          *TSP.Size              `protobuf:"bytes,2,opt,name=size" json:"size,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1340,7 +1340,7 @@ const file_TSCHArchives_Common_proto_rawDesc = "" +
 	"\vRectArchive\x12\"\n" +
 	"\x06origin\x18\x01 \x02(\v2\n" +
 	".TSP.PointR\x06origin\x12\x1d\n" +
-	"\x04size\x18\x02 \x02(\v2\t.TSP.SizeR\x04size\"D\n" +
+	"\x04size\x18\x02 \x01(\v2\t.TSP.SizeR\x04size\"D\n" +
 	"\x1bChartsNSNumberDoubleArchive\x12%\n" +
 	"\x0enumber_archive\x18\x01 \x01(\x01R\rnumberArchive\"@\n" +
 	"$ChartsNSArrayOfNSNumberDoubleArchive\x12\x18\n" +

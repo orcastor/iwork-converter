@@ -10,6 +10,7 @@ import (
 	"math"
 	"os"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/orcastor/iwork-converter/index"
@@ -122,12 +123,11 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive, ocr func(io.Reader) 
 				}
 
 				var cellType int
-				// this has changed since I first wrote the code.  There is now a 4 in the first byte and the type in the next
-				// the "stingrayreader" site says there is a halfword "version" and then the type, which I think worked at one
-				// point, but I no longer have the file.
-				if cellStorageBuffer[offset] == 4 {
+				// Parse cellType from byte[1] (when byte[0]=5) - same as iwork2html
+				if cellStorageBuffer[offset] == 5 {
 					cellType = int(cellStorageBuffer[offset+1])
 				} else {
+					// Fallback for other formats
 					cellType = int(cellStorageBuffer[offset+2])
 				}
 
@@ -227,93 +227,53 @@ func (ctx *Context) processDrawableArchive(da *TSD.DrawableArchive, ocr func(io.
 	return ""
 }
 
-// storageToNode populates a html node with the contents of a StorageArchive. This happens with both the
-// main body of the document and rich text table cells.
+// storageToNode extracts text content from a StorageArchive
 func (ctx *Context) storageToNode(bs *TSWP.StorageArchive, ocr func(io.Reader) (string, error)) (string, error) {
-	var doc string
-
 	texts := bs.Text
-	if len(texts) != 1 {
-		return doc, fmt.Errorf("FIXME - Expecting exactly one text, got %d", len(texts))
+
+	if len(texts) == 0 {
+		return "", fmt.Errorf("no text content found")
 	}
-	text := texts[0]
+
+	// Process multiple text fragments
+	var text string
+	if len(texts) == 1 {
+		text = texts[0]
+	} else {
+		// Merge multiple text fragments
+		for _, t := range texts {
+			text += t
+		}
+	}
 
 	// Offsets are in terms of unicode runes, so we have to convert to runes
 	rr := []rune(text)
 
-	// <p>
+	// Process paragraphs
 	parStyles := bs.TableParaStyle.Entries
+	var result string
 
-	var attachments []Attachment
-	if bs.TableAttachment != nil {
-		for _, entry := range bs.TableAttachment.Entries {
-			pos := *entry.CharacterIndex
-			switch ctx.ix.Deref(entry.Object).(type) {
-			case *TSWP.DrawableAttachmentArchive:
-				archive := ctx.ix.Deref(entry.Object).(*TSWP.DrawableAttachmentArchive)
-				d := ctx.processDrawable(archive.Drawable, ocr)
-				if d != "" {
-					attachments = append(attachments, Attachment{pos, d})
-				}
-			case *TSWP.NumberAttachmentArchive:
-				// do nothing...
-			}
-		}
-	}
-	// bs.TableListStyle - seems to change on headings, look into it.
-
-	// build paragraphs
+	// Process each paragraph
 	for i, e := range parStyles {
-
 		pos := *e.CharacterIndex
 		end := uint32(len(rr))
 		if i+1 < len(parStyles) {
 			end = *parStyles[i+1].CharacterIndex
 		}
 
-		for len(attachments) > 0 && attachments[0].pos < end {
-			if attachments[0].pos != pos {
-				fmt.Printf("FIXME - attachment not at start of paragraph - pstart=%d pend=%d att=%d par=%#v\n",
-					pos, end, attachments[0].pos, string(rr[pos:end]))
-			}
-			doc += attachments[0].doc
-			attachments = attachments[1:]
+		// Extract paragraph text
+		paragraphText := string(rr[pos:end])
+
+		// Skip empty paragraphs
+		if strings.TrimSpace(paragraphText) == "" {
+			continue
 		}
 
-		// <span> <em> and <b>
-		if bs.TableCharStyle != nil {
-			charStyles := bs.TableCharStyle.Entries
-			for i, e := range charStyles { // build any span/em/b as needed
-				cs := *e.CharacterIndex
-				if cs < pos {
-					continue
-				}
-				if cs >= end {
-					break
-				}
-				ce := uint32(len(rr))
-				if i+1 < len(charStyles) {
-					ce = *charStyles[i+1].CharacterIndex
-				}
-				if ce > end {
-					if e.Object != nil {
-						// fmt.Println("ERR? ce > end", ce, end, e.Object)
-					}
-					ce = end
-				}
-				if cs > pos {
-					doc += string(rr[pos:cs])
-					pos = cs
-				}
-				doc += string(rr[cs:ce])
-				pos = ce
-			}
-		}
-		doc += string(rr[pos:end])
-		doc += string("\n")
+		// Add paragraph text to result
+		result += paragraphText + "\n"
 	}
 
-	return doc, nil
+	return result, nil
 }
 
 type Style map[string]interface{}
@@ -406,35 +366,40 @@ func (ctx *Context) processNumbers(ocr func(io.Reader) (string, error)) string {
 func (ctx *Context) processKeynote(ocr func(io.Reader) (string, error)) string {
 	var doc string
 
-	meta := ctx.ix.Records[2].(*TSP.PackageMetadata)
-	ids := []uint64{}
-	for _, comp := range meta.Components {
-		if *comp.PreferredLocator == "Slide" {
-			ids = append(ids, *comp.Identifier)
-		}
-	}
-	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
-
-	// Debug: Check for ShowArchive and SlideTree
+	// First try to use SlideTree.Slides order
+	var slideTreeSlides []*TSP.Reference
 	for _, rec := range ctx.ix.Records {
 		if sh, ok := rec.(*KN.ShowArchive); ok {
-			fmt.Printf("DEBUG: Found ShowArchive\n")
-			if sh.SlideTree != nil {
-				fmt.Printf("DEBUG: SlideTree found!\n")
-				if sh.SlideTree.RootSlideNode != nil {
-					fmt.Printf("DEBUG: RootSlideNode: %v\n", sh.SlideTree.RootSlideNode)
-				}
-				if sh.SlideTree.Slides != nil {
-					fmt.Printf("DEBUG: Slides count: %d\n", len(sh.SlideTree.Slides))
-					for i, slide := range sh.SlideTree.Slides {
-						fmt.Printf("DEBUG: Slide[%d]: %v\n", i, slide)
+			if sh.SlideTree != nil && sh.SlideTree.Slides != nil {
+				slideTreeSlides = sh.SlideTree.Slides
+				break
+			}
+		}
+	}
+
+	ids := []uint64{}
+	if slideTreeSlides != nil {
+		// Use SlideTree.Slides order and check IsSkipped field
+		for _, slideRef := range slideTreeSlides {
+			if slideRef != nil && slideRef.Identifier != nil {
+				slideNodeId := *slideRef.Identifier
+				if slideNode, ok := ctx.ix.Records[slideNodeId].(*KN.SlideNodeArchive); ok {
+					// Check if slide is skipped
+					if slideNode.Slide != nil && slideNode.Slide.Identifier != nil {
+						actualSlideId := *slideNode.Slide.Identifier
+						ids = append(ids, actualSlideId)
 					}
 				}
-			} else {
-				fmt.Printf("DEBUG: SlideTree is nil\n")
 			}
-			break
 		}
+	} else {
+		// Fallback to original method
+		for key, rec := range ctx.ix.Records {
+			if _, ok := rec.(*KN.SlideArchive); ok {
+				ids = append(ids, key)
+			}
+		}
+		sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
 	}
 
 	for _, id := range ids {

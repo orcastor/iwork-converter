@@ -13,7 +13,9 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -31,7 +33,7 @@ import (
 )
 
 // Global debug mode flag
-var debugMode bool
+var debugMode bool = true
 
 // SetDebugMode sets the global debug mode
 func SetDebugMode(debug bool) {
@@ -82,6 +84,9 @@ type Context struct {
 	ix        *index.Index
 	zr        *zip.ReadCloser
 	fontScale float64
+	// Slide dimensions for font scaling
+	slideWidth  float64
+	slideHeight float64
 }
 
 // Control whether to output table cell debug logs
@@ -242,6 +247,79 @@ func (ctx *Context) applyCellStyle(tm *TST.TableModelArchive, key uint32) string
 	return style
 }
 
+// applyNumbersCellStyle applies Numbers-specific cell styles from dedicated style references
+func (ctx *Context) applyNumbersCellStyle(styleRef *TSP.Reference) string {
+	style := ""
+
+	if styleRef == nil {
+		return style
+	}
+
+	styleObj := ctx.ix.Deref(styleRef)
+	if styleObj == nil {
+		if debugTableCells {
+			fmt.Printf("DEBUG: Failed to deref Numbers style reference\n")
+		}
+		return style
+	}
+
+	if debugTableCells {
+		fmt.Printf("DEBUG: Numbers style object type: %T\n", styleObj)
+	}
+
+	// Handle CellStyleArchive
+	if csa, ok := styleObj.(*TST.CellStyleArchive); ok {
+		if csa.CellProperties != nil {
+			// Handle background fill
+			if csa.CellProperties.CellFill != nil {
+				if css := colorToCSS(csa.CellProperties.CellFill.GetColor()); css != "" {
+					applyBackgroundColor(&style, css, true)
+					if debugTableCells {
+						fmt.Printf("DEBUG: Applied Numbers cell background: %s\n", css)
+					}
+				}
+			}
+			// Handle borders and rounded corners
+			processCellBorders(&style, csa.CellProperties)
+			// Handle font size
+			processCellFont(&style, csa.CellProperties)
+		}
+	} else if psa, ok := styleObj.(*TSWP.ParagraphStyleArchive); ok {
+		// Handle paragraph styles as cell styles
+		if psa.ParaProperties != nil {
+			// Handle paragraph background fill
+			if psa.ParaProperties.Fill != nil {
+				if css := colorToCSS(psa.ParaProperties.Fill); css != "" {
+					applyBackgroundColor(&style, css, false)
+					if debugTableCells {
+						fmt.Printf("DEBUG: Applied Numbers paragraph background: %s\n", css)
+					}
+				}
+			}
+			// Handle paragraph borders
+			if psa.ParaProperties.Stroke != nil {
+				col := colorToCSS(psa.ParaProperties.Stroke.Color)
+				w := 1.0
+				if psa.ParaProperties.Stroke.Width != nil {
+					w = float64(*psa.ParaProperties.Stroke.Width)
+				}
+				if col != "" {
+					style += fmt.Sprintf("border: %.2fpx solid %s; box-sizing: border-box;", w, col)
+					if debugTableCells {
+						fmt.Printf("DEBUG: Applied Numbers paragraph border: %.2fpx solid %s\n", w, col)
+					}
+				}
+			}
+		}
+	} else {
+		if debugTableCells {
+			fmt.Printf("DEBUG: Unrecognized Numbers style type: %T\n", styleObj)
+		}
+	}
+
+	return style
+}
+
 // applyBackgroundColor unified background color application
 func applyBackgroundColor(style *string, css string, important bool) {
 	if css == "" {
@@ -295,20 +373,6 @@ func (ctx *Context) applyPositionBasedStyle(tm *TST.TableModelArchive, globalRow
 	// Return empty string to rely on CSS styles
 	// Individual cell styles will be applied from StyleTable in the cell processing loop
 	return ""
-}
-
-// isTextCell checks if the cell at the given offset contains text content
-func (ctx *Context) isTextCell(offset uint16, stringTable []*TST.TableDataList_ListEntry, richTable []*TST.TableDataList_ListEntry) bool {
-	if offset == 65535 {
-		return false // Empty cell
-	}
-
-	// For non-empty cells (offset != 65535), assume they contain text content
-	// The actual content lookup happens later in the cell processing
-	if debugTableCells {
-		fmt.Printf("DEBUG: isTextCell - offset=%d, assuming has text content\n", offset)
-	}
-	return true
 }
 
 func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
@@ -1276,22 +1340,71 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
 				fmt.Printf("DEBUG: Cell at row %d, col %d will use key %d for content lookup\n", r, c, key)
 			}
 
-			// Apply cell-specific styles from StyleTable
-			// For header rows, try to use a style that has background color
-			styleKey := key
-			if r == 0 && tm.BaseDataStore != nil && tm.BaseDataStore.StyleTable != nil {
-				// Try to find a style with background color for header row
-				styleTableRef := ctx.ix.Deref(tm.BaseDataStore.StyleTable)
-				if tdl, ok := styleTableRef.(*TST.TableDataList); ok {
-					for _, entry := range tdl.Entries {
-						if entry.Key != nil && entry.Reference != nil {
-							entryRef := ctx.ix.Deref(entry.Reference)
-							if csa, ok := entryRef.(*TST.CellStyleArchive); ok {
-								if csa.CellProperties != nil && csa.CellProperties.CellFill != nil {
-									// Found a style with background color, use it for header
+			// Debug: check Numbers style fields
+			if debugTableCells && r == 0 && c == 0 {
+				fmt.Printf("DEBUG: Document type: %s\n", ctx.ix.Type)
+				if ctx.ix.Type == "numbers" {
+					fmt.Printf("DEBUG: Numbers style fields - HeaderRowStyle: %v, BodyCellStyle: %v, HeaderColumnStyle: %v, FooterRowStyle: %v\n",
+						tm.HeaderRowStyle != nil, tm.BodyCellStyle != nil, tm.HeaderColumnStyle != nil, tm.FooterRowStyle != nil)
+				}
+			}
+
+			// Apply cell-specific styles
+			var cellStyle string
+
+			// For Numbers documents, use the dedicated style fields
+			if ctx.ix.Type == "numbers" {
+				if r == 0 && tm.HeaderRowStyle != nil {
+					// Header row style
+					cellStyle = ctx.applyNumbersCellStyle(tm.HeaderRowStyle)
+				} else if c == 0 && tm.HeaderColumnStyle != nil {
+					// Header column style
+					cellStyle = ctx.applyNumbersCellStyle(tm.HeaderColumnStyle)
+				} else if tm.NumberOfRows != nil && r == int(*tm.NumberOfRows)-1 && tm.FooterRowStyle != nil {
+					// Footer row style
+					cellStyle = ctx.applyNumbersCellStyle(tm.FooterRowStyle)
+				} else if tm.BodyCellStyle != nil {
+					// Body cell style
+					cellStyle = ctx.applyNumbersCellStyle(tm.BodyCellStyle)
+				}
+			} else {
+				// For Pages documents, use the old StyleTable approach
+				styleKey := key
+				if r == 0 && tm.BaseDataStore != nil && tm.BaseDataStore.StyleTable != nil {
+					// Try to find a style with background color for header row
+					styleTableRef := ctx.ix.Deref(tm.BaseDataStore.StyleTable)
+					if tdl, ok := styleTableRef.(*TST.TableDataList); ok {
+						for _, entry := range tdl.Entries {
+							if entry.Key != nil && entry.Reference != nil {
+								entryRef := ctx.ix.Deref(entry.Reference)
+								if csa, ok := entryRef.(*TST.CellStyleArchive); ok {
+									if csa.CellProperties != nil && csa.CellProperties.CellFill != nil {
+										// Found a style with background color, use it for header
+										styleKey = *entry.Key
+										if debugTableCells {
+											fmt.Printf("DEBUG: Using style key %d for header row (has background color)\n", styleKey)
+										}
+										break
+									}
+								}
+							}
+						}
+					}
+				}
+
+				// For non-header rows, ensure they don't use background color styles
+				if r > 0 && tm.BaseDataStore != nil && tm.BaseDataStore.StyleTable != nil {
+					styleTableRef := ctx.ix.Deref(tm.BaseDataStore.StyleTable)
+					if tdl, ok := styleTableRef.(*TST.TableDataList); ok {
+						// Try to find a plain text style (ParagraphStyleArchive) for content rows
+						for _, entry := range tdl.Entries {
+							if entry.Key != nil && entry.Reference != nil {
+								entryRef := ctx.ix.Deref(entry.Reference)
+								if _, ok := entryRef.(*TSWP.ParagraphStyleArchive); ok {
+									// Found a paragraph style, use it for content rows
 									styleKey = *entry.Key
 									if debugTableCells {
-										fmt.Printf("DEBUG: Using style key %d for header row (has background color)\n", styleKey)
+										fmt.Printf("DEBUG: Using style key %d for content row %d (plain text style)\n", styleKey, r)
 									}
 									break
 								}
@@ -1299,59 +1412,43 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
 						}
 					}
 				}
-			}
 
-			// For non-header rows, ensure they don't use background color styles
-			if r > 0 && tm.BaseDataStore != nil && tm.BaseDataStore.StyleTable != nil {
-				styleTableRef := ctx.ix.Deref(tm.BaseDataStore.StyleTable)
-				if tdl, ok := styleTableRef.(*TST.TableDataList); ok {
-					// Try to find a plain text style (ParagraphStyleArchive) for content rows
-					for _, entry := range tdl.Entries {
-						if entry.Key != nil && entry.Reference != nil {
-							entryRef := ctx.ix.Deref(entry.Reference)
-							if _, ok := entryRef.(*TSWP.ParagraphStyleArchive); ok {
-								// Found a paragraph style, use it for content rows
-								styleKey = *entry.Key
-								if debugTableCells {
-									fmt.Printf("DEBUG: Using style key %d for content row %d (plain text style)\n", styleKey, r)
-								}
-								break
-							}
-						}
-					}
+				if styleKey != 0 {
+					cellStyle = ctx.applyCellStyle(tm, styleKey)
 				}
 			}
 
-			if styleKey != 0 {
-				cellStyle := ctx.applyCellStyle(tm, styleKey)
-				if cellStyle != "" {
-					// Merge with existing basic style
-					existingStyle := ""
-					for _, attr := range td.Attr {
-						if attr.Key == "style" {
-							existingStyle = attr.Val
-							break
-						}
+			if cellStyle != "" {
+				// Merge with existing basic style
+				existingStyle := ""
+				for _, attr := range td.Attr {
+					if attr.Key == "style" {
+						existingStyle = attr.Val
+						break
 					}
-					if existingStyle != "" {
-						cellStyle = existingStyle + ";" + cellStyle
-					}
+				}
+				if existingStyle != "" {
+					cellStyle = existingStyle + ";" + cellStyle
+				}
 
-					// Update or add style attribute
-					styleFound := false
-					for i, attr := range td.Attr {
-						if attr.Key == "style" {
-							td.Attr[i].Val = cellStyle
-							styleFound = true
-							break
-						}
+				// Update or add style attribute
+				styleFound := false
+				for i, attr := range td.Attr {
+					if attr.Key == "style" {
+						td.Attr[i].Val = cellStyle
+						styleFound = true
+						break
 					}
-					if !styleFound {
-						td.Attr = append(td.Attr, html.Attribute{Key: "style", Val: cellStyle})
-					}
-					if debugTableCells {
-						fmt.Printf("DEBUG: Applied cell-specific style for key %d: %s\n", key, cellStyle)
-					}
+				}
+				if !styleFound {
+					td.Attr = append(td.Attr, html.Attribute{Key: "style", Val: cellStyle})
+				}
+				if debugTableCells {
+					fmt.Printf("DEBUG: Applied cell-specific style for key %d: %s\n", key, cellStyle)
+				}
+			} else {
+				if debugTableCells {
+					fmt.Printf("DEBUG: No cell-specific style found for key %d\n", key)
 				}
 			}
 
@@ -1755,7 +1852,7 @@ func (ctx *Context) processDrawable(ref *TSP.Reference) *html.Node {
 				node.Attr = append(node.Attr, html.Attribute{Key: "class", Val: "background-img"})
 				return node
 			}
-			return ctx.wrapWithGeometry(node, img.Super.Geometry, "")
+			return ctx.wrapWithGeometry(node, img.Super.Geometry, "", false)
 		}
 		return node
 	case *TST.WPTableInfoArchive:
@@ -1763,6 +1860,9 @@ func (ctx *Context) processDrawable(ref *TSP.Reference) *html.Node {
 		tm := ctx.ix.Deref(table.Super.TableModel).(*TST.TableModelArchive)
 		return ctx.processTable(tm)
 	case *TST.TableInfoArchive:
+		if debugTableCells {
+			fmt.Printf("DEBUG: Processing Numbers TableInfoArchive\n")
+		}
 		tm := ctx.ix.Deref(item.(*TST.TableInfoArchive).TableModel).(*TST.TableModelArchive)
 		return ctx.processTable(tm)
 	case *TSWP.ShapeInfoArchive:
@@ -1877,14 +1977,14 @@ func (ctx *Context) processDrawable(ref *TSP.Reference) *html.Node {
 					bgClass = "bgimg_" + strings.TrimSuffix(strings.TrimPrefix(fillCSS, "url(#bgimg_"), ")")
 					extra += "background-size:cover;background-position:center;"
 				} else {
-					// Disable background color application
-					// extra += "background:" + fillCSS + ";"
+					// Apply background color for text boxes
+					extra += "background:" + fillCSS + ";"
 				}
 			}
 			if strokeCSS != "" {
 				extra += strokeCSS
 			}
-			wrapper := ctx.wrapWithGeometry(node, sia.Super.Super.Geometry, extra)
+			wrapper := ctx.wrapWithGeometry(node, sia.Super.Super.Geometry, extra, true)
 			if bgClass != "" {
 				wrapper.Attr = append(wrapper.Attr, html.Attribute{Key: "class", Val: bgClass})
 			}
@@ -1935,7 +2035,7 @@ func (ctx *Context) processDrawableArchive(da *TSD.DrawableArchive) *html.Node {
 		// DrawableArchive has no direct style fields, styles are handled through other means
 
 		// Apply geometry styles
-		return ctx.wrapWithGeometry(container, da.Geometry, "")
+		return ctx.wrapWithGeometry(container, da.Geometry, "", false)
 	}
 
 	return nil
@@ -1962,7 +2062,8 @@ func (ctx *Context) processNumberAttachment(na *TSWP.NumberAttachmentArchive) *h
 
 // wrapWithGeometry wraps a child node with an absolutely positioned container based on TSD.GeometryArchive.
 // extraStyle can include any CSS declarations, e.g. "background:rgba(...);border:1px solid red; display:flex;"
-func (ctx *Context) wrapWithGeometry(child *html.Node, geom *TSD.GeometryArchive, extraStyle string) *html.Node {
+// isTextBox indicates if this is a text box that needs y-position adjustment based on font size
+func (ctx *Context) wrapWithGeometry(child *html.Node, geom *TSD.GeometryArchive, extraStyle string, isTextBox bool) *html.Node {
 	if geom == nil || geom.Position == nil || geom.Size == nil {
 		return child
 	}
@@ -2005,6 +2106,16 @@ func (ctx *Context) wrapWithGeometry(child *html.Node, geom *TSD.GeometryArchive
 	}
 	if geom.Position.Y != nil {
 		y = float64(*geom.Position.Y) * sy
+
+		// For text boxes, only apply a very small adjustment for large fonts
+		if isTextBox && child != nil {
+			fontSize := ctx.getTextBoxFontSize(child)
+			// Only adjust for very large fonts (>50pt) to avoid over-correction
+			if fontSize > 50 {
+				adjustment := fontSize * 0.05
+				y -= adjustment
+			}
+		}
 	}
 	if geom.Size.Width != nil {
 		w = float64(*geom.Size.Width) * sx
@@ -2037,6 +2148,80 @@ func (ctx *Context) wrapWithGeometry(child *html.Node, geom *TSD.GeometryArchive
 		wrapper.AppendChild(child)
 	}
 	return wrapper
+}
+
+// getTextBoxFontSize extracts font size from text box content
+func (ctx *Context) getTextBoxFontSize(node *html.Node) float64 {
+	if node == nil {
+		return 0
+	}
+
+	// Look for font-size in style attributes
+	for _, attr := range node.Attr {
+		if attr.Key == "style" {
+			// Parse CSS for font-size
+			if strings.Contains(attr.Val, "font-size:") {
+				// Extract font-size value using regex
+				re := regexp.MustCompile(`font-size:\s*([0-9.]+)pt`)
+				matches := re.FindStringSubmatch(attr.Val)
+				if len(matches) > 1 {
+					if size, err := strconv.ParseFloat(matches[1], 64); err == nil {
+						return size
+					}
+				}
+			}
+		}
+	}
+
+	// Look in child nodes for font-size
+	var child *html.Node
+	for child = node.FirstChild; child != nil; child = child.NextSibling {
+		if child.Type == html.ElementNode {
+			for _, attr := range child.Attr {
+				if attr.Key == "class" {
+					// Check if this class has font-size defined
+					if style, exists := ctx.styles[attr.Val]; exists {
+						if strings.Contains(style, "font-size:") {
+							re := regexp.MustCompile(`font-size:\s*([0-9.]+)pt`)
+							matches := re.FindStringSubmatch(style)
+							if len(matches) > 1 {
+								if size, err := strconv.ParseFloat(matches[1], 64); err == nil {
+									return size
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return 0
+}
+
+// getTextBoxLineCount counts the number of lines in text box content
+func (ctx *Context) getTextBoxLineCount(node *html.Node) int {
+	if node == nil {
+		return 1
+	}
+
+	lineCount := 1
+	var child *html.Node
+	for child = node.FirstChild; child != nil; child = child.NextSibling {
+		if child.Type == html.ElementNode {
+			if child.Data == "p" {
+				lineCount++
+			} else if child.Data == "br" {
+				lineCount++
+			}
+		} else if child.Type == html.TextNode {
+			// Count newlines in text content
+			text := child.Data
+			lineCount += strings.Count(text, "\n")
+		}
+	}
+
+	return lineCount
 }
 
 // getFloatValue safely gets float value from pointer
@@ -2475,7 +2660,7 @@ func (ctx *Context) processTableCellParagraph(text []rune, paraStyle *TSWP.Objec
 						}
 					}
 
-					style := translateCharProps(ref.CharProperties)
+					style := translateCharProps(ctx, ref.CharProperties)
 
 					props := ref.CharProperties
 					if props != nil && props.Bold != nil && *props.Bold &&
@@ -2585,7 +2770,7 @@ func (ctx *Context) processTableCellText(text []rune, paraStyle *TSWP.ParagraphS
 
 					// Apply character styles
 					if csa.CharProperties != nil {
-						style := translateCharProps(csa.CharProperties)
+						style := translateCharProps(ctx, csa.CharProperties)
 						if style != "" {
 							span.Attr = append(span.Attr, html.Attribute{Key: "style", Val: style})
 						}
@@ -2719,7 +2904,11 @@ func (ctx *Context) storageToNode(bs *TSWP.StorageArchive, body *html.Node) erro
 				ctx.mergeParentStyles(ref, parent)
 			}
 
-			ctx.styles[className] = translateParaProps(ctx.ix, ref.ParaProperties) + translateCharProps(ref.CharProperties)
+			style := translateParaProps(ctx.ix, ref.ParaProperties) + translateCharProps(ctx, ref.CharProperties)
+			if debugMode {
+				fmt.Printf("DEBUG: Style for class %s: %s\n", className, style)
+			}
+			ctx.styles[className] = style
 
 			if ref.ParaProperties.OutlineLevel != nil {
 				level := *ref.ParaProperties.OutlineLevel
@@ -2839,7 +3028,7 @@ func (ctx *Context) storageToNode(bs *TSWP.StorageArchive, body *html.Node) erro
 						ctx.mergeParentCharStyles(ref, parent)
 					}
 
-					style := translateCharProps(ref.CharProperties)
+					style := translateCharProps(ctx, ref.CharProperties)
 
 					// Check specific style properties to decide which tag to use
 					props := ref.CharProperties
@@ -3447,6 +3636,9 @@ func (ctx *Context) processPages() *html.Node {
 }
 
 func (ctx *Context) processNumbers() *html.Node {
+	if debugTableCells {
+		fmt.Printf("DEBUG: processNumbers called, debugTableCells=%v\n", debugTableCells)
+	}
 	// Root of output document
 	head, body := E("head", "\n", E("meta", []string{"charset", "utf-8"}), "\n"), E("body", "\n")
 	doc := E("", E("html"), "\n", E("html", head, "\n", body))
@@ -3458,7 +3650,13 @@ func (ctx *Context) processNumbers() *html.Node {
 		sheet := ctx.ix.Deref(ref).(*TN.SheetArchive)
 		section := E("section", E("h2", "Sheet - ", *sheet.Name))
 		body.AppendChild(section)
-		for _, ref := range sheet.DrawableInfos {
+		if debugTableCells {
+			fmt.Printf("DEBUG: Processing Numbers sheet with %d drawables\n", len(sheet.DrawableInfos))
+		}
+		for i, ref := range sheet.DrawableInfos {
+			if debugTableCells {
+				fmt.Printf("DEBUG: Processing drawable %d\n", i)
+			}
 			// if this cast throws there are other kinds of drawables...
 			e := ctx.processDrawable(ref)
 			if e != nil {
@@ -3544,20 +3742,31 @@ func (ctx *Context) processKeynote() *html.Node {
 		fmt.Printf("DEBUG: Final slide count for display: %d\n", len(ids))
 	}
 
-	// Read canvas size to set slide aspect ratio precisely
-	canvasW := 1920.0
-	canvasH := 1080.0
+	var canvasW, canvasH float64
+	foundSize := false
+	showArchiveCount := 0
 	for _, rec := range ctx.ix.Records {
 		if sh, ok := rec.(*KN.ShowArchive); ok {
+			showArchiveCount++
 			if sh.Size != nil && sh.Size.Width != nil && sh.Size.Height != nil {
 				canvasW = float64(*sh.Size.Width)
 				canvasH = float64(*sh.Size.Height)
-				if debugMode {
-					fmt.Printf("DEBUG: Canvas size: %.0f x %.0f\n", canvasW, canvasH)
-				}
+				foundSize = true
+				break
 			}
-			break
 		}
+	}
+
+	if !foundSize {
+		canvasW = 1920.0
+		canvasH = 1080.0
+	}
+
+	ctx.slideWidth = canvasW
+	ctx.slideHeight = canvasH
+
+	if debugMode {
+		fmt.Printf("DEBUG: Using actual slide dimensions: %.0f x %.0f\n", canvasW, canvasH)
 	}
 
 	container := E("container", []string{"class", "slide-container"})
@@ -3597,6 +3806,35 @@ func (ctx *Context) processKeynote() *html.Node {
 		style.AppendChild(T(fmt.Sprintf(".%s {\n%s}\n", k, v)))
 	}
 	head.AppendChild(style)
+
+	// Add JavaScript to dynamically calculate slide width and scale fonts
+	script := E("script")
+	script.AppendChild(T(fmt.Sprintf(`
+		(function() {
+			var originalSlideWidth = %.0f;
+			var scaleFactor = 1;
+			
+			function updateFontScale() {
+				var slides = document.querySelectorAll('.slide');
+				if (slides.length > 0) {
+					var renderWidth = slides[0].offsetWidth;
+					var viewportWidth = window.innerWidth;
+					var expectedWidth = Math.min(1200, viewportWidth - 48);
+					
+					scaleFactor = Math.min(1, renderWidth / originalSlideWidth);
+					document.documentElement.style.setProperty('--slide-scale', scaleFactor);
+					
+				}
+			}
+
+			updateFontScale();
+			window.addEventListener('resize', updateFontScale);
+			
+			window.addEventListener('load', updateFontScale);
+		})();
+	`, ctx.slideWidth)))
+	head.AppendChild(script)
+
 	return doc
 }
 
@@ -3618,7 +3856,7 @@ func mergeCharProps(props *TSWP.CharacterStylePropertiesArchive, parent *TSWP.Ch
 }
 
 // translateCharProps converts a TSWP.CharacterStylePropertiesArchive into CSS
-func translateCharProps(props *TSWP.CharacterStylePropertiesArchive) string {
+func translateCharProps(ctx *Context, props *TSWP.CharacterStylePropertiesArchive) string {
 	if props == nil {
 		return ""
 	}
@@ -3632,8 +3870,7 @@ func translateCharProps(props *TSWP.CharacterStylePropertiesArchive) string {
 	}
 	if props.FontSize != nil {
 		fs := float64(*props.FontSize)
-		// Use original font size directly without scaling
-		rval += fmt.Sprintf("font-size: %.2fpt;", fs)
+		rval += fmt.Sprintf("font-size: calc(var(--slide-scale, 1) * %.2fpt);", fs)
 	}
 	if props.FontName != nil {
 		rval += fmt.Sprintf("font-family: '%s';", *props.FontName)
@@ -3702,16 +3939,16 @@ func translateParaProps(ix *index.Index, props *TSWP.ParagraphStylePropertiesArc
 		rval += fmt.Sprintf("  margin-bottom: %fpt;\n", *props.SpaceAfter)
 	}
 
-	// Paragraph background fill -> background color disabled
-	// if props.Fill != nil {
-	//	if css := colorToCSS(props.Fill); css != "" {
-	//		if strings.HasPrefix(css, "rgba(") || strings.HasPrefix(css, "rgb(") || strings.HasPrefix(css, "#") {
-	//			rval += fmt.Sprintf("  background-color:%s;\n", css)
-	//		} else {
-	//			rval += fmt.Sprintf("  background:%s;\n", css)
-	//		}
-	//	}
-	// }
+	// Paragraph background fill
+	if props.Fill != nil {
+		if css := colorToCSS(props.Fill); css != "" {
+			if strings.HasPrefix(css, "rgba(") || strings.HasPrefix(css, "rgb(") || strings.HasPrefix(css, "#") {
+				rval += fmt.Sprintf("  background-color:%s;\n", css)
+			} else {
+				rval += fmt.Sprintf("  background:%s;\n", css)
+			}
+		}
+	}
 
 	// List style processing - re-enable simple list style processing
 	if props.ListStyleNull == nil || !*props.ListStyleNull {

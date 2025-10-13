@@ -94,7 +94,7 @@ enum FractionAccuracy {
 
 message RectArchive {
   required .TSP.Point origin = 1;
-  required .TSP.Size size = 2;
+  optional .TSP.Size size = 2;
 }
 
 message ChartsNSNumberDoubleArchive {

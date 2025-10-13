@@ -264,8 +264,8 @@ message CommandSetMultiDataSetIndexArchive {
 
 message CommandSetLegendFrameArchive {
   required ChartCommandArchive super = 1;
-  required RectArchive old_legend_frame = 2;
-  required RectArchive new_legend_frame = 3;
+  optional RectArchive old_legend_frame = 2;
+  optional RectArchive new_legend_frame = 3;
 }
 
 message CommandSetPieWedgeExplosion {

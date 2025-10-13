@@ -15,7 +15,7 @@ message ChartInfoArchive {
   optional .TSP.Reference style = 3;
   required .TSCH.ChartType chart_type = 4;
   optional LegendModelArchive legend_model = 5;
-  required .TSCH.RectArchive inner_chart_frame = 6;
+  optional .TSCH.RectArchive inner_chart_frame = 6;
   repeated .TSP.Reference value_axis_styles = 7;
   repeated .TSP.Reference category_axis_styles = 8;
   repeated .TSP.Reference value_axis_nonstyles = 9;
@@ -36,7 +36,7 @@ message ChartInfoArchive {
 
 message LegendModelArchive {
   optional .TSP.Reference info = 1;
-  required .TSCH.RectArchive frame = 2;
+  optional .TSCH.RectArchive frame = 2;
   required .TSP.Reference style = 3;
   required .TSP.Reference non_style = 4;
 }
