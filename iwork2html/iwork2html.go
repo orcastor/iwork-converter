@@ -83,7 +83,7 @@ type Context struct {
 }
 
 // Control whether to output table cell debug logs
-var debugTableCells = false
+var debugTableCells = true
 
 // Control whether to output image processing debug logs
 var debugImages = true
@@ -290,10 +290,9 @@ func (ctx *Context) mergeParentCharStyles(child, parent *TSWP.CharacterStyleArch
 
 // applyPositionBasedStyle applies styles based on cell position - now uses cell's own style from StyleTable
 func (ctx *Context) applyPositionBasedStyle(tm *TST.TableModelArchive, globalRow, c int, shouldTreatFirstRowAsHeader bool) string {
-	// For now, just return basic positioning styles
+	// Return empty string to rely on CSS styles
 	// Individual cell styles will be applied from StyleTable in the cell processing loop
-	style := "white-space: normal;vertical-align: top;"
-	return style
+	return ""
 }
 
 // isTextCell checks if the cell at the given offset contains text content
@@ -493,14 +492,185 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
 	// Check which columns actually have content by analyzing the data
 	hasContentColumns := make([]bool, cc)
 
-	// For Numbers tables, assume all columns have content unless proven otherwise
-	// This is different from Pages where tables are often used for layout
-	for i := 0; i < cc; i++ {
-		hasContentColumns[i] = true
-	}
+	// Only detect empty columns for Pages documents
+	// For Numbers, show all columns regardless of content
+	if ctx.ix.Type == "pages" {
+		// First, try to get column widths from columnHeaders
+		columnWidths := make([]float32, cc)
+		hasWidthInfo := false
 
-	// TODO: In the future, we could analyze the actual cell data to determine
-	// which columns really have content, but for now assume all columns are active
+		if tm.BaseDataStore != nil && tm.BaseDataStore.ColumnHeaders != nil {
+			colHeadersRef := ctx.ix.Deref(tm.BaseDataStore.ColumnHeaders)
+			if debugTableCells {
+				fmt.Printf("DEBUG: ColumnHeaders type: %T\n", colHeadersRef)
+			}
+
+			// ColumnHeaders can be either HeaderStorage or HeaderStorageBucket
+			if colHeaders, ok := colHeadersRef.(*TST.HeaderStorage); ok {
+				// HeaderStorage: contains multiple buckets
+				for bucketIdx, bucketRef := range colHeaders.Buckets {
+					if bucket, ok := ctx.ix.Deref(bucketRef).(*TST.HeaderStorageBucket); ok {
+						if debugTableCells {
+							fmt.Printf("DEBUG: Bucket %d has %d headers\n", bucketIdx, len(bucket.Headers))
+						}
+						for _, header := range bucket.Headers {
+							if header.Index != nil && header.Size != nil {
+								idx := *header.Index
+								if int(idx) < len(columnWidths) {
+									columnWidths[idx] = *header.Size
+									hasWidthInfo = true
+									if debugTableCells {
+										fmt.Printf("DEBUG: Column %d width=%.2f\n", idx, *header.Size)
+									}
+								}
+							}
+						}
+					}
+				}
+			} else if bucket, ok := colHeadersRef.(*TST.HeaderStorageBucket); ok {
+				// HeaderStorageBucket: single bucket with headers
+				if debugTableCells {
+					fmt.Printf("DEBUG: Single bucket has %d headers\n", len(bucket.Headers))
+				}
+				for _, header := range bucket.Headers {
+					if header.Index != nil && header.Size != nil {
+						idx := *header.Index
+						if int(idx) < len(columnWidths) {
+							columnWidths[idx] = *header.Size
+							hasWidthInfo = true
+							if debugTableCells {
+								fmt.Printf("DEBUG: Column %d width=%.2f\n", idx, *header.Size)
+							}
+						}
+					}
+				}
+			}
+		} else if debugTableCells {
+			fmt.Printf("DEBUG: No ColumnHeaders available\n")
+		}
+
+		// Filter columns based on width and merge patterns
+		if hasWidthInfo {
+			// Check if columns have similar widths (indicating potential merged cells)
+			// and filter based on content patterns
+			columnUniqueKeys := make(map[int]map[uint32]bool)
+			for i := 0; i < int(cc); i++ {
+				columnUniqueKeys[i] = make(map[uint32]bool)
+			}
+
+			if tm.BaseDataStore != nil && tm.BaseDataStore.Tiles != nil {
+				for _, tinfo := range tm.BaseDataStore.Tiles.Tiles {
+					tile := ctx.ix.Deref(tinfo.Tile).(*TST.Tile)
+					for _, rinfo := range tile.RowInfos {
+						var offsets []uint16
+						if len(rinfo.CellOffsets) > 0 {
+							offsets = make([]uint16, len(rinfo.CellOffsets)/2)
+							binary.Read(bytes.NewBuffer(rinfo.CellOffsets), LE, offsets)
+						}
+
+						cellStorageBuf := rinfo.CellStorageBuffer
+						if len(cellStorageBuf) == 0 && len(rinfo.CellStorageBufferPreBnc) > 0 {
+							cellStorageBuf = rinfo.CellStorageBufferPreBnc
+						}
+
+						for c := 0; c < int(cc) && c < len(offsets); c++ {
+							offset := offsets[c]
+							if offset != 65535 && len(cellStorageBuf) >= int(offset)+16 {
+								key := LE.Uint32(cellStorageBuf[offset+12 : offset+16])
+								if key != 0 {
+									columnUniqueKeys[c][key] = true
+								}
+							}
+						}
+					}
+				}
+			}
+
+			// Column detection strategy:
+			// 1. Keep columns with width >= 1.0 AND diverse content
+			// 2. Skip columns that have only merged cell keys (low diversity)
+			for c := 0; c < int(cc); c++ {
+				uniqueKeyCount := len(columnUniqueKeys[c])
+
+				// Keep column if:
+				// - Width >= 1.0
+				// - AND (first column OR has highly diverse content: >70% unique keys)
+				if columnWidths[c] >= 1.0 {
+					if c == 0 {
+						// Always keep first column
+						hasContentColumns[c] = true
+					} else if uniqueKeyCount > int(rows)*7/10 && uniqueKeyCount > 1 {
+						// Keep columns with significant content diversity (>70% of rows have unique keys)
+						// This filters out columns with mostly merged cells
+						hasContentColumns[c] = true
+					}
+				}
+
+				if debugTableCells {
+					fmt.Printf("DEBUG: Column %d width=%.2f, unique_keys=%d, keep=%v\n", c, columnWidths[c], uniqueKeyCount, hasContentColumns[c])
+				}
+			}
+
+			// Removed: automatic second column addition
+			// User feedback indicates only Column 0 should be shown
+		} else {
+			// Fallback: use content-based detection
+			columnUniqueKeys := make(map[int]map[uint32]bool)
+			for i := 0; i < int(cc); i++ {
+				columnUniqueKeys[i] = make(map[uint32]bool)
+			}
+
+			if tm.BaseDataStore != nil && tm.BaseDataStore.Tiles != nil {
+				for _, tinfo := range tm.BaseDataStore.Tiles.Tiles {
+					tile := ctx.ix.Deref(tinfo.Tile).(*TST.Tile)
+					for _, rinfo := range tile.RowInfos {
+						var offsets []uint16
+						if len(rinfo.CellOffsets) > 0 {
+							offsets = make([]uint16, len(rinfo.CellOffsets)/2)
+							binary.Read(bytes.NewBuffer(rinfo.CellOffsets), LE, offsets)
+						}
+
+						cellStorageBuf := rinfo.CellStorageBuffer
+						if len(cellStorageBuf) == 0 && len(rinfo.CellStorageBufferPreBnc) > 0 {
+							cellStorageBuf = rinfo.CellStorageBufferPreBnc
+						}
+
+						for c := 0; c < int(cc) && c < len(offsets); c++ {
+							offset := offsets[c]
+							if offset != 65535 && len(cellStorageBuf) >= int(offset)+16 {
+								key := LE.Uint32(cellStorageBuf[offset+12 : offset+16])
+								if key != 0 {
+									columnUniqueKeys[c][key] = true
+								}
+							}
+						}
+					}
+				}
+
+				// Keep columns with diverse content
+				for c := 0; c < int(cc); c++ {
+					uniqueKeyCount := len(columnUniqueKeys[c])
+					if c == 0 {
+						hasContentColumns[c] = uniqueKeyCount > 0
+					} else if uniqueKeyCount >= int(rows)*3/10 && uniqueKeyCount > 2 {
+						hasContentColumns[c] = true
+					}
+				}
+
+				// Removed: automatic second column addition
+				// User feedback indicates only diverse columns should be shown
+			} else {
+				for i := 0; i < cc; i++ {
+					hasContentColumns[i] = true
+				}
+			}
+		}
+	} else {
+		// For Numbers and other types, show all columns
+		for i := 0; i < cc; i++ {
+			hasContentColumns[i] = true
+		}
+	}
 
 	// Calculate the number of columns with content
 	contentColumnCount := 0
@@ -551,17 +721,21 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
 	// Note: Remove key usage tracking because the same key may need to be used in multiple cells
 	// usedKeys := make(map[uint32]bool) // Commented out to avoid blocking duplicate content
 
-	// Only treat first row as header if NumberOfHeaderRows is explicitly set
-	shouldTreatFirstRowAsHeader := false
-	if tm.NumberOfHeaderRows != nil && *tm.NumberOfHeaderRows > 0 {
-		shouldTreatFirstRowAsHeader = true
+	// Determine if first row should be treated as header
+	// Default to true for tables with multiple rows (common case)
+	shouldTreatFirstRowAsHeader := true
+	headerRowCount := 1
+
+	if tm.NumberOfHeaderRows != nil {
+		headerRowCount = int(*tm.NumberOfHeaderRows)
+		shouldTreatFirstRowAsHeader = headerRowCount > 0
 		if debugTableCells {
-			fmt.Printf("DEBUG: NumberOfHeaderRows is %d - treating first row as header\n", *tm.NumberOfHeaderRows)
+			fmt.Printf("DEBUG: NumberOfHeaderRows explicitly set to %d\n", headerRowCount)
 		}
 	} else {
-		shouldTreatFirstRowAsHeader = false
+		// Default: treat first row as header for multi-row tables
 		if debugTableCells {
-			fmt.Printf("DEBUG: NumberOfHeaderRows is nil or 0 - treating first row as regular content\n")
+			fmt.Printf("DEBUG: NumberOfHeaderRows is nil - defaulting to 1 header row\n")
 		}
 	}
 
@@ -579,6 +753,47 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
 	for _, tinfo := range tm.BaseDataStore.Tiles.Tiles {
 		tile := ctx.ix.Deref(tinfo.Tile).(*TST.Tile)
 		tileMap[*tinfo.Tileid] = tile
+
+		// Debug: show physical order of rows in tile
+		if debugTableCells && len(tile.RowInfos) > 10 {
+			fmt.Printf("DEBUG: Tile physical order (first 15 rows):\n")
+			for i, rinfo := range tile.RowInfos {
+				if i < 15 && rinfo.TileRowIndex != nil {
+					fmt.Printf("DEBUG:   Physical[%d] -> TileRowIndex=%d\n", i, *rinfo.TileRowIndex)
+				}
+			}
+		}
+	}
+
+	// Try to get row order from RowHeaders (similar to ColumnHeaders)
+	// RowHeaders contains the actual display order with index field
+	rowOrderMap := make(map[uint32]uint32) // maps TileRowIndex to display order
+	hasRowHeaders := false
+
+	if tm.BaseDataStore != nil && tm.BaseDataStore.RowHeaders != nil {
+		// RowHeaders is a HeaderStorage, need to read buckets
+		for _, bucketRef := range tm.BaseDataStore.RowHeaders.Buckets {
+			if bucket, ok := ctx.ix.Deref(bucketRef).(*TST.HeaderStorageBucket); ok {
+				if debugTableCells {
+					fmt.Printf("DEBUG: RowHeaders bucket has %d headers\n", len(bucket.Headers))
+				}
+				for _, header := range bucket.Headers {
+					if header.Index != nil {
+						idx := *header.Index
+						// Index field represents the display order
+						rowOrderMap[idx] = idx
+						hasRowHeaders = true
+						if debugTableCells && idx < 15 {
+							fmt.Printf("DEBUG: RowHeader[%d]: index=%d\n", idx, idx)
+						}
+					}
+				}
+			}
+		}
+	}
+
+	if debugTableCells && hasRowHeaders {
+		fmt.Printf("DEBUG: Found RowHeaders with %d row mappings\n", len(rowOrderMap))
 	}
 
 	// Use rowTileTree to get correct row order
@@ -695,6 +910,18 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
 					}
 				}
 			}
+
+			// Important: Sort all rows (including supplemented ones) by TileRowIndex
+			sort.Slice(orderedRows, func(i, j int) bool {
+				if orderedRows[i].RowInfo.TileRowIndex != nil && orderedRows[j].RowInfo.TileRowIndex != nil {
+					return *orderedRows[i].RowInfo.TileRowIndex < *orderedRows[j].RowInfo.TileRowIndex
+				}
+				return i < j
+			})
+
+			if debugTableCells {
+				fmt.Printf("DEBUG: After supplementing, sorted %d rows by TileRowIndex\n", len(orderedRows))
+			}
 		}
 	}
 
@@ -707,13 +934,24 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
 
 	for r, rowData := range orderedRows {
 		rinfo := rowData.RowInfo
+
+		// Special case: Skip rows with small buffers (20 bytes)
+		// These appear to be placeholder/reference rows that don't contain actual displayable content
+		if len(rinfo.CellStorageBuffer) == 20 {
+			if debugTableCells && len(orderedRows) == 18 {
+				fmt.Printf("DEBUG: Row %2d SKIPPED (small buffer=20 bytes, appears to be a reference row)\n", r)
+			}
+			continue // Skip this row entirely
+		}
+
 		tr := E("tr")
-		// Header row determined by row number or smart detection result
-		isHeaderRow := false
-		if tm.NumberOfHeaderRows != nil && r < int(*tm.NumberOfHeaderRows) {
-			isHeaderRow = true
-		} else if shouldTreatFirstRowAsHeader && r == 0 {
-			isHeaderRow = true
+		// Header row determined by headerRowCount
+		isHeaderRow := r < headerRowCount
+
+		// Mark last row as summary/total row
+		isSummaryRow := (r == len(orderedRows)-1)
+		if isSummaryRow {
+			tr.Attr = append(tr.Attr, html.Attribute{Key: "class", Val: "summary-row"})
 		}
 
 		if isHeaderRow {
@@ -751,8 +989,15 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
 			}
 		}
 
-		if debugTableCells && r == 10 {
-			fmt.Printf("DEBUG: Row %d keys: %v\n", r, rowKeys)
+		// Debug output for 18-row table (second table)
+		if debugTableCells && len(orderedRows) == 18 && r < 18 {
+			bufferSize := len(rinfo.CellStorageBuffer)
+			tileRowIdx := uint32(0)
+			if rinfo.TileRowIndex != nil {
+				tileRowIdx = *rinfo.TileRowIndex
+			}
+			// Show all column keys for this row
+			fmt.Printf("DEBUG: Row %2d all keys: %v (bufferSize=%d, TileRowIndex=%d)\n", r, rowKeys[:min(7, len(rowKeys))], bufferSize, tileRowIdx)
 		}
 
 		// Special handling for summary/total rows:
@@ -952,8 +1197,8 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
 				continue
 			}
 
-			// Debug: print the key that will be used for content lookup (only for first few cells)
-			if debugTableCells && r < 3 && c < 3 {
+			// Debug: print the key that will be used for content lookup (for column 0 of all rows in debug mode)
+			if debugTableCells && c == 0 {
 				fmt.Printf("DEBUG: Cell at row %d, col %d will use key %d for content lookup\n", r, c, key)
 			}
 
@@ -1016,14 +1261,6 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
 					}
 					if existingStyle != "" {
 						cellStyle = existingStyle + ";" + cellStyle
-					}
-
-					// Add center alignment for header rows
-					if r == 0 {
-						cellStyle += ";text-align: center;"
-						if debugTableCells {
-							fmt.Printf("DEBUG: Added center alignment for header row\n")
-						}
 					}
 
 					// Update or add style attribute
@@ -2892,8 +3129,10 @@ func (ctx *Context) processPages() *html.Node {
 			".page { position: relative; width: min(900px, calc(100vw - 48px)); aspect-ratio: 210 / 297; background: #fff; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.25); box-sizing: border-box; padding: 20px; }\n" +
 			".page * { box-sizing: border-box; }\n" +
 			"p { margin: 0; line-height: 1.2; }\n" +
-			".page table { width: 100%; margin: 0; border-collapse: collapse; }\n" +
-			".page td, .page th { padding: 0; vertical-align: top; border: none; }\n" +
+			"/* Table Styles */\n" +
+			".page table { width: 100%; margin: 16px auto; border-collapse: collapse; border: 1px solid #ddd; }\n" +
+			".page td, .page th { padding: 8px 12px; vertical-align: middle; border: 1px solid #ddd; }\n" +
+			".page tbody tr:hover { background-color: #fafafa; }\n" +
 			"/* Table pagination optimization styles */\n" +
 			".page table.table-paginated { page-break-inside: auto; }\n" +
 			".page table.table-paginated thead { display: table-header-group; }\n" +
