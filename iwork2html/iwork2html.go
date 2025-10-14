@@ -730,18 +730,9 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
 			for c := 0; c < int(cc); c++ {
 				uniqueKeyCount := len(columnUniqueKeys[c])
 
-				// Keep column if:
-				// - Width >= 1.0
-				// - AND (first column OR has highly diverse content: >70% unique keys)
-				if columnWidths[c] >= 1.0 {
-					if c == 0 {
-						// Always keep first column
-						hasContentColumns[c] = true
-					} else if uniqueKeyCount > int(rows)*7/10 && uniqueKeyCount > 1 {
-						// Keep columns with significant content diversity (>70% of rows have unique keys)
-						// This filters out columns with mostly merged cells
-						hasContentColumns[c] = true
-					}
+				// Keep column if it has any content
+				if uniqueKeyCount > 0 {
+					hasContentColumns[c] = true
 				}
 
 				if debugTableCells {
@@ -790,7 +781,7 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
 					uniqueKeyCount := len(columnUniqueKeys[c])
 					if c == 0 {
 						hasContentColumns[c] = uniqueKeyCount > 0
-					} else if uniqueKeyCount >= int(rows)*3/10 && uniqueKeyCount > 2 {
+					} else if uniqueKeyCount > 0 {
 						hasContentColumns[c] = true
 					}
 				}
@@ -1297,21 +1288,13 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
 			if offset != 65535 && len(activeBuffer) >= int(offset)+16 {
 				// Debug: show complete 16-byte structure for first column
 				if debugTableCells && c == 0 && r <= 10 {
-					// Show more bytes to see if there's embedded text
-					endOffset := offset + 64
-					if endOffset > uint16(len(activeBuffer)) {
-						endOffset = uint16(len(activeBuffer))
-					}
-					buf := activeBuffer[offset:endOffset]
-					fmt.Printf("  Buffer[%d:%d] (%d bytes): %v\n", offset, endOffset, len(buf), buf)
-					fmt.Printf("  As string: %q\n", string(buf))
-					if len(buf) >= 16 {
-						fmt.Printf("  offset+0:  %d (0x%08x)\n", LE.Uint32(buf[0:4]), LE.Uint32(buf[0:4]))
-						fmt.Printf("  offset+4:  %d (0x%08x)\n", LE.Uint32(buf[4:8]), LE.Uint32(buf[4:8]))
-						fmt.Printf("  offset+8:  %d (0x%08x)\n", LE.Uint32(buf[8:12]), LE.Uint32(buf[8:12]))
-						fmt.Printf("  offset+12: %d (0x%08x)\n", LE.Uint32(buf[12:16]), LE.Uint32(buf[12:16]))
-						fmt.Printf("  byte[0]=%d, byte[1]=%d (cellType indicator)\n", buf[0], buf[1])
-					}
+					buf := activeBuffer[offset : offset+16]
+					fmt.Printf("  16-byte buffer: %v\n", buf)
+					fmt.Printf("  offset+0:  %d (0x%08x)\n", LE.Uint32(buf[0:4]), LE.Uint32(buf[0:4]))
+					fmt.Printf("  offset+4:  %d (0x%08x)\n", LE.Uint32(buf[4:8]), LE.Uint32(buf[4:8]))
+					fmt.Printf("  offset+8:  %d (0x%08x)\n", LE.Uint32(buf[8:12]), LE.Uint32(buf[8:12]))
+					fmt.Printf("  offset+12: %d (0x%08x) <-- key position\n", LE.Uint32(buf[12:16]), LE.Uint32(buf[12:16]))
+					fmt.Printf("  byte[0]=5, byte[1]=%d (cellType indicator)\n", buf[1])
 				}
 
 				// Parse cellType from byte[1] (when byte[0]=5)
@@ -1319,20 +1302,8 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
 					cellType = activeBuffer[offset+1]
 				}
 
-				// For Pages tables: try offset+4 first (like hasCellContent), then offset+12 as fallback
-				if len(activeBuffer) >= int(offset)+8 {
-					key = LE.Uint32(activeBuffer[offset+4 : offset+8])
-					if debugTableCells && c == 0 && r <= 10 {
-						fmt.Printf("  Trying key from offset+4: %d (0x%08x)\n", key, key)
-					}
-				}
-				// Fallback to offset+12 if offset+4 didn't work
-				if key == 0 && len(activeBuffer) >= int(offset)+16 {
-					key = LE.Uint32(activeBuffer[offset+12 : offset+16])
-					if debugTableCells && c == 0 && r <= 10 {
-						fmt.Printf("  Fallback to key from offset+12: %d (0x%08x)\n", key, key)
-					}
-				}
+				// For Pages tables: key is at offset+12 (last 4 bytes of 16-byte cell structure)
+				key = LE.Uint32(activeBuffer[offset+12 : offset+16])
 
 				if debugTableCells && r <= 10 {
 					fmt.Printf("  Row %d, Col %d: cellType=%d, key=%d\n", r, c, cellType, key)
@@ -2199,7 +2170,7 @@ func (ctx *Context) wrapWithGeometry(child *html.Node, geom *TSD.GeometryArchive
 	} else {
 		widthStyle = fmt.Sprintf("width:%.2fpx;", w)
 	}
-	
+
 	style := fmt.Sprintf("position:absolute; left:%.2fpx; top:%.2fpx; %s height:%.2fpx;", x, y, widthStyle, h)
 	if angle != 0 {
 		// For lines (height=0), use start point as rotation origin
