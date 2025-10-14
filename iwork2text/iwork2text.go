@@ -141,24 +141,35 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive, ocr func(io.Reader) 
 				}
 
 				var cellType int
-				// Parse cellType from byte[1] (when byte[0]=5) - same as iwork2html
-				if cellStorageBuffer[offset] == 5 {
-					cellType = int(cellStorageBuffer[offset+1])
-				}
+				var key uint32
 
-				// Try both key calculation methods
-				// Method 1: Simple offset+12 (like iwork2html)
-				key := LE.Uint32(cellStorageBuffer[offset+12 : offset+16])
+				// Check buffer bounds before accessing
+				if len(cellStorageBuffer) >= int(offset)+16 {
+					// Parse cellType from byte[1] (when byte[0]=5) - same as iwork2html
+					if cellStorageBuffer[offset] == 5 {
+						cellType = int(cellStorageBuffer[offset+1])
+					}
 
-				// Method 2: Original popcount method (fallback)
-				if key == 0 {
-					flags := LE.Uint16(cellStorageBuffer[offset+4 : offset+6])
-					o := popcount(flags)*4 + 8 + int(offset)
-					key = LE.Uint32(cellStorageBuffer[o : o+4])
+					// Try both key calculation methods
+					// Method 1: Simple offset+12 (like iwork2html)
+					key = LE.Uint32(cellStorageBuffer[offset+12 : offset+16])
+
+					// Method 2: Original popcount method (fallback)
+					if key == 0 && len(cellStorageBuffer) >= int(offset)+6 {
+						flags := LE.Uint16(cellStorageBuffer[offset+4 : offset+6])
+						o := popcount(flags)*4 + 8 + int(offset)
+						if len(cellStorageBuffer) >= o+4 {
+							key = LE.Uint32(cellStorageBuffer[o : o+4])
+						}
+					}
 				}
 
 				if debugTableCells {
-					fmt.Printf("DEBUG: Row %d, Col %d: cellType=%d, key=%d, offset=%d, buffer[offset]=%d\n", rowIndex, c, cellType, key, offset, cellStorageBuffer[offset])
+					if len(cellStorageBuffer) > int(offset) {
+						fmt.Printf("DEBUG: Row %d, Col %d: cellType=%d, key=%d, offset=%d, buffer[offset]=%d\n", rowIndex, c, cellType, key, offset, cellStorageBuffer[offset])
+					} else {
+						fmt.Printf("DEBUG: Row %d, Col %d: cellType=%d, key=%d, offset=%d, buffer[offset]=out of range\n", rowIndex, c, cellType, key, offset)
+					}
 					if cellType == 0 {
 						fmt.Printf("DEBUG: Found cellType=0 cell at Row %d, Col %d with key=%d\n", rowIndex, c, key)
 					}
@@ -290,10 +301,12 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive, ocr func(io.Reader) 
 						value = math.Float64frombits(LE.Uint64(cellStorageBuffer[offset+12 : offset+20]))
 					} else {
 						// Fallback to popcount method
-						flags := LE.Uint16(cellStorageBuffer[offset+4 : offset+6])
-						o := popcount(flags)*4 + 8 + int(offset)
-						if len(cellStorageBuffer) >= o+8 {
-							value = math.Float64frombits(LE.Uint64(cellStorageBuffer[o : o+8]))
+						if len(cellStorageBuffer) >= int(offset)+6 {
+							flags := LE.Uint16(cellStorageBuffer[offset+4 : offset+6])
+							o := popcount(flags)*4 + 8 + int(offset)
+							if len(cellStorageBuffer) >= o+8 {
+								value = math.Float64frombits(LE.Uint64(cellStorageBuffer[o : o+8]))
+							}
 						}
 					}
 					label := "???"

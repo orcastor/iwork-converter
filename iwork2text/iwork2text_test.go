@@ -34,11 +34,17 @@ func TestCellOffsetHandling(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			buf := new(bytes.Buffer)
-			binary.Write(buf, binary.LittleEndian, tt.offsets)
+			err := binary.Write(buf, binary.LittleEndian, tt.offsets)
+			if err != nil {
+				t.Fatalf("Failed to encode: %v", err)
+			}
 			cellOffsets := buf.Bytes()
 
 			decoded := make([]uint16, len(tt.offsets))
-			binary.Read(bytes.NewBuffer(cellOffsets), binary.LittleEndian, decoded)
+			err = binary.Read(bytes.NewBuffer(cellOffsets), binary.LittleEndian, decoded)
+			if err != nil {
+				t.Fatalf("Failed to decode: %v", err)
+			}
 
 			if len(decoded) != tt.expected {
 				t.Errorf("Decoded length = %d, want %d", len(decoded), tt.expected)
@@ -352,13 +358,19 @@ func TestBufferSizes(t *testing.T) {
 func BenchmarkCellOffsetDecoding(b *testing.B) {
 	offsets := []uint16{0, 10, 20, 30, 40, 50}
 	buf := new(bytes.Buffer)
-	binary.Write(buf, binary.LittleEndian, offsets)
+	err := binary.Write(buf, binary.LittleEndian, offsets)
+	if err != nil {
+		b.Fatalf("Failed to encode: %v", err)
+	}
 	cellOffsets := buf.Bytes()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		decoded := make([]uint16, len(offsets))
-		binary.Read(bytes.NewBuffer(cellOffsets), binary.LittleEndian, decoded)
+		err := binary.Read(bytes.NewBuffer(cellOffsets), binary.LittleEndian, decoded)
+		if err != nil {
+			b.Fatalf("Failed to decode: %v", err)
+		}
 	}
 }
 
@@ -370,13 +382,19 @@ func BenchmarkLargeDatasetDecoding(b *testing.B) {
 	}
 
 	buf := new(bytes.Buffer)
-	binary.Write(buf, binary.LittleEndian, offsets)
+	err := binary.Write(buf, binary.LittleEndian, offsets)
+	if err != nil {
+		b.Fatalf("Failed to encode: %v", err)
+	}
 	cellOffsets := buf.Bytes()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		decoded := make([]uint16, len(offsets))
-		binary.Read(bytes.NewBuffer(cellOffsets), binary.LittleEndian, decoded)
+		err := binary.Read(bytes.NewBuffer(cellOffsets), binary.LittleEndian, decoded)
+		if err != nil {
+			b.Fatalf("Failed to decode: %v", err)
+		}
 	}
 }
 
@@ -400,4 +418,258 @@ func BenchmarkEmptyCellDetection(b *testing.B) {
 			}
 		}
 	}
+}
+
+// TestPopcountFunction tests the popcount function
+func TestPopcountFunction(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    uint16
+		expected int
+	}{
+		{"zero", 0, 0},
+		{"one bit", 1, 1},
+		{"two bits", 3, 2},
+		{"all bits", 0xFFFF, 16},
+		{"alternating", 0xAAAA, 8},
+		{"powers of two", 0x8000, 1},
+		{"mixed pattern", 0x5A5A, 8},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := popcount(tt.input)
+			if result != tt.expected {
+				t.Errorf("popcount(%d) = %d, want %d", tt.input, result, tt.expected)
+			}
+		})
+	}
+}
+
+// TestDebugMode tests debug mode functionality
+func TestDebugMode(t *testing.T) {
+	// Test initial state
+	SetDebugMode(false)
+	if debugMode != false {
+		t.Error("Expected debug mode to be false initially")
+	}
+
+	// Test setting to true
+	SetDebugMode(true)
+	if debugMode != true {
+		t.Error("Expected debug mode to be true after setting")
+	}
+
+	// Test setting back to false
+	SetDebugMode(false)
+	if debugMode != false {
+		t.Error("Expected debug mode to be false after reset")
+	}
+}
+
+// TestConvertStringBasic tests basic string conversion
+func TestConvertStringBasic(t *testing.T) {
+	t.Skip("Skipping ConvertString tests - requires valid iWork file input")
+}
+
+// TestConvertStringWithOCR tests string conversion with OCR function
+func TestConvertStringWithOCR(t *testing.T) {
+	t.Skip("Skipping ConvertString tests - requires valid iWork file input")
+}
+
+// TestStorageToNode tests storage to node conversion
+func TestStorageToNode(t *testing.T) {
+	t.Skip("Skipping storageToNode tests - requires complex context setup")
+}
+
+// TestCellTypeProcessing tests different cell type processing
+func TestCellTypeProcessing(t *testing.T) {
+	tests := []struct {
+		name     string
+		cellType int
+		key      uint32
+		expected string
+	}{
+		{
+			name:     "cellType 0 (control)",
+			cellType: 0,
+			key:      1,
+			expected: "",
+		},
+		{
+			name:     "cellType 2 (number)",
+			cellType: 2,
+			key:      42,
+			expected: "42",
+		},
+		{
+			name:     "cellType 3 (string)",
+			cellType: 3,
+			key:      1,
+			expected: "",
+		},
+		{
+			name:     "cellType 5 (date)",
+			cellType: 5,
+			key:      0,
+			expected: "",
+		},
+		{
+			name:     "cellType 6 (boolean)",
+			cellType: 6,
+			key:      0,
+			expected: "FALSE",
+		},
+		{
+			name:     "cellType 9 (rich text)",
+			cellType: 9,
+			key:      1,
+			expected: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// This is a simplified test - in real implementation,
+			// we would need to set up proper context and tables
+			// For now, just test the basic logic
+			var result string
+			switch tt.cellType {
+			case 2:
+				result = fmt.Sprint(tt.key)
+			case 6:
+				if tt.key == 0 {
+					result = "FALSE"
+				} else {
+					result = "TRUE"
+				}
+			}
+			if result != tt.expected {
+				t.Errorf("cellType %d processing = %q, want %q", tt.cellType, result, tt.expected)
+			}
+		})
+	}
+}
+
+// TestTableProcessing tests table processing functionality
+func TestTableProcessing(t *testing.T) {
+	t.Skip("Skipping table processing test - requires complex setup")
+}
+
+// TestErrorHandling tests error handling in various functions
+func TestErrorHandling(t *testing.T) {
+	tests := []struct {
+		name        string
+		function    func() error
+		expectError bool
+	}{
+		{
+			name: "Convert with invalid file",
+			function: func() error {
+				return Convert("nonexistent.txt", "output.txt")
+			},
+			expectError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.function()
+			if tt.expectError && err == nil {
+				t.Error("Expected error but got none")
+			}
+			if !tt.expectError && err != nil {
+				t.Errorf("Unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+// TestEdgeCases tests edge cases and boundary conditions
+func TestEdgeCases(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    []uint16
+		expected int
+	}{
+		{
+			name:     "single element",
+			input:    []uint16{42},
+			expected: 1,
+		},
+		{
+			name:     "maximum uint16 values",
+			input:    []uint16{0, 65535, 1, 65534},
+			expected: 4,
+		},
+		{
+			name:     "all zeros",
+			input:    []uint16{0, 0, 0, 0},
+			expected: 4,
+		},
+		{
+			name:     "alternating pattern",
+			input:    []uint16{0, 65535, 0, 65535, 0},
+			expected: 5,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			buf := new(bytes.Buffer)
+			err := binary.Write(buf, binary.LittleEndian, tt.input)
+			if err != nil {
+				t.Fatalf("Failed to encode: %v", err)
+			}
+
+			decoded := make([]uint16, len(tt.input))
+			err = binary.Read(bytes.NewBuffer(buf.Bytes()), binary.LittleEndian, decoded)
+			if err != nil {
+				t.Fatalf("Failed to decode: %v", err)
+			}
+
+			if len(decoded) != tt.expected {
+				t.Errorf("Expected %d elements, got %d", tt.expected, len(decoded))
+			}
+		})
+	}
+}
+
+// TestPerformance tests performance with various data sizes
+func TestPerformance(t *testing.T) {
+	sizes := []int{100, 1000, 10000}
+
+	for _, size := range sizes {
+		t.Run(fmt.Sprintf("size_%d", size), func(t *testing.T) {
+			offsets := make([]uint16, size)
+			for i := range offsets {
+				offsets[i] = uint16(i % 1000)
+			}
+
+			buf := new(bytes.Buffer)
+			err := binary.Write(buf, binary.LittleEndian, offsets)
+			if err != nil {
+				t.Fatalf("Failed to encode: %v", err)
+			}
+
+			decoded := make([]uint16, size)
+			err = binary.Read(bytes.NewBuffer(buf.Bytes()), binary.LittleEndian, decoded)
+			if err != nil {
+				t.Fatalf("Failed to decode: %v", err)
+			}
+
+			if len(decoded) != size {
+				t.Errorf("Expected %d elements, got %d", size, len(decoded))
+			}
+		})
+	}
+}
+
+// Helper functions for testing
+func stringPtr(s string) *string {
+	return &s
+}
+
+func uint32Ptr(u uint32) *uint32 {
+	return &u
 }

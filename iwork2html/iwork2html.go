@@ -1284,7 +1284,11 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
 			// Debug output for first column
 			if debugTableCells && c == 0 && r <= 10 {
 				fmt.Printf("\nDEBUG: Cell[%d,%d] buffer analysis:\n", r, c)
-				fmt.Printf("  Regular offset: %d\n", contentOffsets[c])
+				if c < len(contentOffsets) {
+					fmt.Printf("  Regular offset: %d\n", contentOffsets[c])
+				} else {
+					fmt.Printf("  Regular offset: out of range (c=%d, len=%d)\n", c, len(contentOffsets))
+				}
 				fmt.Printf("  PreBnc offset:  %d\n", preBncOffset)
 				fmt.Printf("  Using: %s\n", map[bool]string{true: "PreBnc", false: "Regular"}[usePreBnc])
 			}
@@ -1293,13 +1297,21 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
 			if offset != 65535 && len(activeBuffer) >= int(offset)+16 {
 				// Debug: show complete 16-byte structure for first column
 				if debugTableCells && c == 0 && r <= 10 {
-					buf := activeBuffer[offset : offset+16]
-					fmt.Printf("  16-byte buffer: %v\n", buf)
-					fmt.Printf("  offset+0:  %d (0x%08x)\n", LE.Uint32(buf[0:4]), LE.Uint32(buf[0:4]))
-					fmt.Printf("  offset+4:  %d (0x%08x)\n", LE.Uint32(buf[4:8]), LE.Uint32(buf[4:8]))
-					fmt.Printf("  offset+8:  %d (0x%08x)\n", LE.Uint32(buf[8:12]), LE.Uint32(buf[8:12]))
-					fmt.Printf("  offset+12: %d (0x%08x) <-- key position\n", LE.Uint32(buf[12:16]), LE.Uint32(buf[12:16]))
-					fmt.Printf("  byte[0]=5, byte[1]=%d (cellType indicator)\n", buf[1])
+					// Show more bytes to see if there's embedded text
+					endOffset := offset + 64
+					if endOffset > uint16(len(activeBuffer)) {
+						endOffset = uint16(len(activeBuffer))
+					}
+					buf := activeBuffer[offset:endOffset]
+					fmt.Printf("  Buffer[%d:%d] (%d bytes): %v\n", offset, endOffset, len(buf), buf)
+					fmt.Printf("  As string: %q\n", string(buf))
+					if len(buf) >= 16 {
+						fmt.Printf("  offset+0:  %d (0x%08x)\n", LE.Uint32(buf[0:4]), LE.Uint32(buf[0:4]))
+						fmt.Printf("  offset+4:  %d (0x%08x)\n", LE.Uint32(buf[4:8]), LE.Uint32(buf[4:8]))
+						fmt.Printf("  offset+8:  %d (0x%08x)\n", LE.Uint32(buf[8:12]), LE.Uint32(buf[8:12]))
+						fmt.Printf("  offset+12: %d (0x%08x)\n", LE.Uint32(buf[12:16]), LE.Uint32(buf[12:16]))
+						fmt.Printf("  byte[0]=%d, byte[1]=%d (cellType indicator)\n", buf[0], buf[1])
+					}
 				}
 
 				// Parse cellType from byte[1] (when byte[0]=5)
@@ -1307,8 +1319,20 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
 					cellType = activeBuffer[offset+1]
 				}
 
-				// For Pages tables: key is at offset+12 (last 4 bytes of 16-byte cell structure)
-				key = LE.Uint32(activeBuffer[offset+12 : offset+16])
+				// For Pages tables: try offset+4 first (like hasCellContent), then offset+12 as fallback
+				if len(activeBuffer) >= int(offset)+8 {
+					key = LE.Uint32(activeBuffer[offset+4 : offset+8])
+					if debugTableCells && c == 0 && r <= 10 {
+						fmt.Printf("  Trying key from offset+4: %d (0x%08x)\n", key, key)
+					}
+				}
+				// Fallback to offset+12 if offset+4 didn't work
+				if key == 0 && len(activeBuffer) >= int(offset)+16 {
+					key = LE.Uint32(activeBuffer[offset+12 : offset+16])
+					if debugTableCells && c == 0 && r <= 10 {
+						fmt.Printf("  Fallback to key from offset+12: %d (0x%08x)\n", key, key)
+					}
+				}
 
 				if debugTableCells && r <= 10 {
 					fmt.Printf("  Row %d, Col %d: cellType=%d, key=%d\n", r, c, cellType, key)
@@ -1514,6 +1538,7 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
 				// cellType=0: control cell (popup menu, checkbox, etc.)
 				// Try to get actual option text from PopUpMenuModel
 				optionText := ""
+				found := false
 
 				// Try to get PopUpMenuModel from DataStore
 				if tm.BaseDataStore != nil && tm.BaseDataStore.MultipleChoiceListFormatTable != nil {
@@ -1533,11 +1558,68 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
 												if debugTableCells {
 													fmt.Printf("DEBUG: cellType=0 found option text from PopUpMenuModel: %s (key=%d, index=%d)\n", optionText, key, itemIndex)
 												}
+												found = true
 												break // Found the option, no need to check other entries
 											}
 										}
 									}
 								}
+							}
+						}
+					}
+				}
+
+				// Fallback to StringTable if PopUpMenuModel didn't yield results
+				if !found && stringTable != nil {
+					if debugTableCells {
+						fmt.Printf("DEBUG: Searching StringTable for key=%d, available keys: ", key)
+						for i, entry := range stringTable {
+							if entry != nil && entry.Key != nil {
+								fmt.Printf("%d", *entry.Key)
+								if i < len(stringTable)-1 {
+									fmt.Printf(", ")
+								}
+							}
+						}
+						fmt.Printf("\n")
+					}
+					for _, entry := range stringTable {
+						if entry != nil && entry.Key != nil && *entry.Key == key {
+							if entry.String_ != nil {
+								optionText = *entry.String_
+								if debugTableCells {
+									fmt.Printf("DEBUG: cellType=0 found text from StringTable fallback: %s (key=%d)\n", optionText, key)
+								}
+								found = true
+								break
+							}
+						}
+					}
+				}
+
+				// Fallback to RichTextTable if still not found
+				if !found && richTable != nil {
+					if debugTableCells {
+						fmt.Printf("DEBUG: Searching RichTextTable for key=%d, available keys: ", key)
+						for i, entry := range richTable {
+							if entry != nil && entry.Key != nil {
+								fmt.Printf("%d", *entry.Key)
+								if i < len(richTable)-1 {
+									fmt.Printf(", ")
+								}
+							}
+						}
+						fmt.Printf("\n")
+					}
+					for _, entry := range richTable {
+						if entry != nil && entry.Key != nil && *entry.Key == key {
+							if entry.String_ != nil {
+								optionText = *entry.String_
+								if debugTableCells {
+									fmt.Printf("DEBUG: cellType=0 found text from RichTextTable fallback: %s (key=%d)\n", optionText, key)
+								}
+								found = true
+								break
 							}
 						}
 					}
@@ -1764,12 +1846,24 @@ func (ctx *Context) processDrawable(ref *TSP.Reference) *html.Node {
 		return ctx.processTable(tm)
 	case *TSWP.ShapeInfoArchive:
 		sia := item.(*TSWP.ShapeInfoArchive)
-		node := ctx.processShapeInfo(sia)
+		node := ctx.processShapeInfo(sia, false)
 		fillCSS := ""
 		strokeCSS := ""
+		if debugMode {
+			fmt.Printf("DEBUG: ShapeInfoArchive - Super=%v, Style=%v\n", sia.Super != nil, sia.Super != nil && sia.Super.Style != nil)
+		}
 		if sia.Super != nil && sia.Super.Style != nil {
 			styleAny := ctx.ix.Deref(sia.Super.Style)
+			if debugMode {
+				fmt.Printf("DEBUG: Style type: %T\n", styleAny)
+			}
 			if ss, ok := styleAny.(*TSD.ShapeStyleArchive); ok {
+				if debugMode {
+					fmt.Printf("DEBUG: TSD.ShapeStyleArchive - ShapeProperties=%v, Fill=%v, Stroke=%v\n",
+						ss.ShapeProperties != nil,
+						ss.ShapeProperties != nil && ss.ShapeProperties.Fill != nil,
+						ss.ShapeProperties != nil && ss.ShapeProperties.Stroke != nil)
+				}
 				if ss.ShapeProperties != nil && ss.ShapeProperties.Fill != nil {
 					if css := colorToCSS(ss.ShapeProperties.Fill.GetColor()); css != "" {
 						fillCSS = css
@@ -1804,9 +1898,46 @@ func (ctx *Context) processDrawable(ref *TSP.Reference) *html.Node {
 					}
 				}
 			} else if swp, ok := styleAny.(*TSWP.ShapeStyleArchive); ok {
+				if debugMode {
+					fmt.Printf("DEBUG: TSWP.ShapeStyleArchive - Super=%v, ShapeProperties=%v, Fill=%v, Stroke=%v\n",
+						swp.GetSuper() != nil,
+						swp.GetSuper() != nil && swp.GetSuper().ShapeProperties != nil,
+						swp.GetSuper() != nil && swp.GetSuper().ShapeProperties != nil && swp.GetSuper().ShapeProperties.Fill != nil,
+						swp.GetSuper() != nil && swp.GetSuper().ShapeProperties != nil && swp.GetSuper().ShapeProperties.Stroke != nil)
+				}
 				if swp.GetSuper() != nil && swp.GetSuper().ShapeProperties != nil && swp.GetSuper().ShapeProperties.Fill != nil {
-					if css := colorToCSS(swp.GetSuper().ShapeProperties.Fill.GetColor()); css != "" {
+					fill := swp.GetSuper().ShapeProperties.Fill
+					color := fill.GetColor()
+					if debugMode {
+						fmt.Printf("DEBUG: Fill.GetColor()=%v, Gradient=%v, Image=%v\n", color, fill.Gradient, fill.Image)
+					}
+					if css := colorToCSS(color); css != "" {
 						fillCSS = css
+						if debugMode {
+							fmt.Printf("DEBUG: Found fillCSS from TSWP.ShapeStyleArchive: %s\n", fillCSS)
+						}
+					} else if g := fill.Gradient; g != nil {
+						// simple linear-gradient from first->last stop
+						stops := g.GetStops()
+						if len(stops) >= 2 {
+							c1 := colorToCSS(stops[0].GetColor())
+							c2 := colorToCSS(stops[len(stops)-1].GetColor())
+							if c1 != "" && c2 != "" {
+								fillCSS = fmt.Sprintf("linear-gradient(%s, %s)", c1, c2)
+								if debugMode {
+									fmt.Printf("DEBUG: Found fillCSS from Gradient: %s\n", fillCSS)
+								}
+							}
+						}
+					} else if img := fill.Image; img != nil && img.Imagedata != nil && img.Imagedata.Identifier != nil {
+						// mark to receive background image later on wrapper
+						ctx.imgs[fmt.Sprintf("Data/%d", *img.Imagedata.Identifier)] = *img.Imagedata.Identifier
+						fillCSS = fmt.Sprintf("url(#bgimg_%d)", *img.Imagedata.Identifier)
+						if debugMode {
+							fmt.Printf("DEBUG: Found fillCSS from Image: %s\n", fillCSS)
+						}
+					} else if debugMode {
+						fmt.Printf("DEBUG: No fill color, gradient, or image found\n")
 					}
 				}
 				if sps := swp.GetSuper().ShapeProperties; sps != nil && sps.Stroke != nil {
@@ -1891,7 +2022,7 @@ func (ctx *Context) processDrawable(ref *TSP.Reference) *html.Node {
 	case *TSD.GroupArchive:
 		return ctx.processDrawableArchive(item.(*TSD.GroupArchive).Super)
 	case *KN.PlaceholderArchive:
-		return ctx.processShapeInfo(item.(*KN.PlaceholderArchive).Super)
+		return ctx.processShapeInfo(item.(*KN.PlaceholderArchive).Super, true)
 	default:
 		msg := fmt.Sprintf("*** Unhandled attachment type %T\n", item)
 		fmt.Println(msg)
@@ -1899,9 +2030,9 @@ func (ctx *Context) processDrawable(ref *TSP.Reference) *html.Node {
 	}
 }
 
-func (ctx *Context) processShapeInfo(sia *TSWP.ShapeInfoArchive) *html.Node {
+func (ctx *Context) processShapeInfo(sia *TSWP.ShapeInfoArchive, wrapGeometry bool) *html.Node {
 	if debugMode {
-		fmt.Printf("DEBUG: Processing ShapeInfo\n")
+		fmt.Printf("DEBUG: Processing ShapeInfo (wrapGeometry=%v)\n", wrapGeometry)
 	}
 	containedStorageRef := ctx.ix.Deref(sia.OwnedStorage)
 	if cs, ok := containedStorageRef.(*TSWP.StorageArchive); ok {
@@ -1910,13 +2041,19 @@ func (ctx *Context) processShapeInfo(sia *TSWP.ShapeInfoArchive) *html.Node {
 		}
 		div := E("div")
 		if ctx.storageToNode(cs, div) == nil {
+			if wrapGeometry {
+				return ctx.processDrawableArchive(sia.Super.Super)
+			}
 			return div
 		}
 	} else {
 		// Print unrecognized ContainedStorage type
 		fmt.Printf("DEBUG: Unrecognized ContainedStorage type: %T\n", containedStorageRef)
 	}
-	return ctx.processDrawableArchive(sia.Super.Super)
+	if wrapGeometry {
+		return ctx.processDrawableArchive(sia.Super.Super)
+	}
+	return E("div")
 }
 
 func (ctx *Context) processDrawableArchive(da *TSD.DrawableArchive) *html.Node {
@@ -1930,6 +2067,22 @@ func (ctx *Context) processDrawableArchive(da *TSD.DrawableArchive) *html.Node {
 		container := E("div", []string{"class", "drawable-archive"})
 
 		// DrawableArchive has no direct style fields, styles are handled through other means
+		if debugMode {
+			angleStr := "nil"
+			if da.Geometry.Angle != nil {
+				angleStr = fmt.Sprintf("%f", *da.Geometry.Angle)
+			}
+			flagsStr := "nil"
+			if da.Geometry.Flags != nil {
+				flagsStr = fmt.Sprintf("%d (0x%x)", *da.Geometry.Flags, *da.Geometry.Flags)
+			}
+			fmt.Printf("DEBUG: Processing DrawableArchive with geometry: Position=(%f,%f), Size=(%f,%f), Angle=%s, Flags=%s\n",
+				*da.Geometry.Position.X, *da.Geometry.Position.Y, *da.Geometry.Size.Width, *da.Geometry.Size.Height, angleStr, flagsStr)
+			// Check if this is a line (height=0) and log additional info
+			if *da.Geometry.Size.Height == 0 {
+				fmt.Printf("DEBUG: This is a line element with width=%f, angle=%s, flags=%s\n", *da.Geometry.Size.Width, angleStr, flagsStr)
+			}
+		}
 
 		// Apply geometry styles
 		return ctx.wrapWithGeometry(container, da.Geometry, "", false)
@@ -1993,6 +2146,11 @@ func (ctx *Context) wrapWithGeometry(child *html.Node, geom *TSD.GeometryArchive
 	sx := targetWidthCSS / canvasW
 	sy := slideHeightCSS / canvasH
 
+	if debugMode {
+		fmt.Printf("DEBUG: Scaling factors - targetWidthCSS=%f, canvasW=%f, canvasH=%f, slideHeightCSS=%f, sx=%f, sy=%f\n",
+			targetWidthCSS, canvasW, canvasH, slideHeightCSS, sx, sy)
+	}
+
 	x := float64(0)
 	y := float64(0)
 	w := float64(0)
@@ -2000,9 +2158,15 @@ func (ctx *Context) wrapWithGeometry(child *html.Node, geom *TSD.GeometryArchive
 	angle := float64(0)
 	if geom.Position.X != nil {
 		x = float64(*geom.Position.X) * sx
+		if debugMode {
+			fmt.Printf("DEBUG: Position X: original=%f, scaled=%f, sx=%f\n", *geom.Position.X, x, sx)
+		}
 	}
 	if geom.Position.Y != nil {
 		y = float64(*geom.Position.Y) * sy
+		if debugMode {
+			fmt.Printf("DEBUG: Position Y: original=%f, scaled=%f, sy=%f\n", *geom.Position.Y, y, sy)
+		}
 
 		// For text boxes, only apply a very small adjustment for large fonts
 		if isTextBox && child != nil {
@@ -2022,11 +2186,32 @@ func (ctx *Context) wrapWithGeometry(child *html.Node, geom *TSD.GeometryArchive
 	}
 	if geom.Angle != nil {
 		angle = float64(*geom.Angle)
+		// Convert from degrees to radians if angle is large (likely in degrees)
+		if angle > 10 {
+			angle = angle * math.Pi / 180.0
+		}
 	}
 
-	style := fmt.Sprintf("position:absolute; left:%.2fpx; top:%.2fpx; width:%.2fpx; height:%.2fpx;", x, y, w, h)
+	// Handle width=0 case for text boxes - make them auto-size to content
+	var widthStyle string
+	if w == 0 && isTextBox {
+		widthStyle = "width:auto; min-width:fit-content;"
+	} else {
+		widthStyle = fmt.Sprintf("width:%.2fpx;", w)
+	}
+	
+	style := fmt.Sprintf("position:absolute; left:%.2fpx; top:%.2fpx; %s height:%.2fpx;", x, y, widthStyle, h)
 	if angle != 0 {
-		style += fmt.Sprintf(" transform: rotate(%.6frad); transform-origin: 0 0;", angle)
+		// For lines (height=0), use start point as rotation origin
+		// For other elements, use top-left corner
+		if h == 0 {
+			style += fmt.Sprintf(" transform: rotate(%.6frad); transform-origin: 0 0;", angle)
+			if debugMode {
+				fmt.Printf("DEBUG: Line element with rotation: angle=%.6frad, position=(%.2f,%.2f), size=(%.2f,%.2f)\n", angle, x, y, w, h)
+			}
+		} else {
+			style += fmt.Sprintf(" transform: rotate(%.6frad); transform-origin: 0 0;", angle)
+		}
 	}
 	if extraStyle != "" {
 		if !strings.HasSuffix(extraStyle, ";") {
@@ -2750,6 +2935,7 @@ func (ctx *Context) storageToNode(bs *TSWP.StorageArchive, body *html.Node) erro
 	// bs.TableListStyle - seems to change on headings, look into it.
 
 	// A null style seems to imply "use the previous class," so this is declared outside the loop.
+	// Reset className for each storageToNode call to prevent style inheritance between different text boxes
 	var className string
 
 	// List state tracking
@@ -2880,7 +3066,12 @@ func (ctx *Context) storageToNode(bs *TSWP.StorageArchive, body *html.Node) erro
 				currentList = nil
 				currentListType = ""
 			}
-			p = E(tag, []string{"class", className})
+			// Only add class attribute if className is not empty
+			if className != "" {
+				p = E(tag, []string{"class", className})
+			} else {
+				p = E(tag)
+			}
 		}
 
 		// <span> <em> and <b> - paragraph character style processing
