@@ -3934,6 +3934,12 @@ func translateCharProps(ctx *Context, props *TSWP.CharacterStylePropertiesArchiv
 	if props.FontName != nil {
 		rval += fmt.Sprintf("font-family: '%s';", *props.FontName)
 	}
+	if props.FontColor != nil && (props.FontColorNull == nil || !*props.FontColorNull) {
+		colorCSS := colorToCSS(props.FontColor)
+		if colorCSS != "" {
+			rval += fmt.Sprintf("color: %s;", colorCSS)
+		}
+	}
 	return rval
 }
 
