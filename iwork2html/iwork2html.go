@@ -1558,14 +1558,10 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
 			} else if cellType == 5 {
 				// cellType=5: date/time cell
 				// Parse date from cell storage buffer using iWork format
-				dateText := fmt.Sprintf("[日期 %d]", key)
+				dateText := ""
 
 				// Try to extract date from key value or buffer
 				if key != 0 {
-					// These key values might be encoded dates
-					// Try different decoding methods
-					found := false
-
 					// Method 1: Try to find DateCellValueArchive by key in format table
 					if tm.BaseDataStore != nil && tm.BaseDataStore.FormatTable != nil {
 						if tdl, ok := ctx.ix.Deref(tm.BaseDataStore.FormatTable).(*TST.TableDataList); ok {
@@ -1579,143 +1575,44 @@ func (ctx *Context) processTable(tm *TST.TableModelArchive) *html.Node {
 												value := *dateVal.Value + 978307200 // Apple to unix epoch
 												tm := time.Unix(int64(value), 0)
 												dateText = tm.Format("2006-01-02")
-												found = true
-
 												if debugTableCells {
 													fmt.Printf("DEBUG: cellType=5 found date from FormatTable: %s (key=%d, value=%f)\n", dateText, key, *dateVal.Value)
 												}
 												break
 											}
+										} else {
+											if debugTableCells {
+												fmt.Printf("DEBUG: Unrecognized type: %T\n", ctx.ix.Deref(entry.Reference))
+											}
 										}
+									}
+								} else {
+									if debugTableCells {
+										fmt.Printf("DEBUG: entry.Reference is nil for key %d=%d, %T\n", *entry.Key, key, ctx.ix.Deref(entry.Reference))
 									}
 								}
 							}
+						} else {
+							if debugTableCells {
+								fmt.Printf("DEBUG: Unrecognized type: %T\n", ctx.ix.Deref(tm.BaseDataStore.FormatTable))
+							}
+						}
+					} else {
+						if debugTableCells {
+							fmt.Printf("DEBUG: Unrecognized type: %T\n", tm.BaseDataStore.FormatTable)
 						}
 					}
 
-					// Method 2: Try to decode key as encoded date
-					if !found {
-						// These key values look like bit flags: 0x40000000, 0xc0000000, 0x80000000
-						// Based on context, they should represent 2021-11-16 to 2021-11-24
-
-						// Try to infer date from key pattern
-						// The keys seem to be in ascending order: 1073741824, 2147483648, 3221225472
-						// This suggests they might represent sequential dates
-
-						// Method 2a: Try to map key values to 2021-11 dates based on pattern
-						// These keys might be encoded as: base_date + (key_index * days_offset)
-
-						// Try different mapping strategies
-						// Strategy 1: Direct mapping based on key value ranges
-						if key >= 1073741824 && key <= 1073741824 {
-							// First key maps to 2021-11-16
-							dateText = "2021-11-16"
-							found = true
-						} else if key >= 2147483648 && key <= 2147483648 {
-							// Second key maps to 2021-11-20 (middle date)
-							dateText = "2021-11-20"
-							found = true
-						} else if key >= 3221225472 && key <= 3221225472 {
-							// Third key maps to 2021-11-24
-							dateText = "2021-11-24"
-							found = true
-						}
-
-						if found && debugTableCells {
-							fmt.Printf("DEBUG: cellType=5 found date from pattern mapping: %s (key=%d)\n", dateText, key)
-						}
-
-						// Method 2b: Try extracting day from bit patterns
-						if !found {
-							year := 2021
-							month := 11
-
-							// Try to extract day from different bit positions
-							day := int(key & 0xFF)
-							if day >= 1 && day <= 31 {
-								tm := time.Date(year, time.Month(month), day, 0, 0, 0, 0, time.UTC)
-								if tm.Year() == year && tm.Month() == time.Month(month) {
-									dateText = tm.Format("2006-01-02")
-									found = true
-
-									if debugTableCells {
-										fmt.Printf("DEBUG: cellType=5 found date from bit field (lower 8 bits): %s (key=%d, day=%d)\n", dateText, key, day)
-									}
-								}
-							}
-						}
-
-						// Method 2c: Try as Apple timestamp (seconds since 2001-01-01)
-						if !found {
-							appleEpoch := time.Date(2001, 1, 1, 0, 0, 0, 0, time.UTC)
-							if key > 0 && key < 1000000000 { // Reasonable range for Apple timestamps
-								tm := appleEpoch.Add(time.Duration(key) * time.Second)
-								if tm.Year() >= 2020 && tm.Year() <= 2025 {
-									dateText = tm.Format("2006-01-02")
-									found = true
-
-									if debugTableCells {
-										fmt.Printf("DEBUG: cellType=5 found date from Apple timestamp: %s (key=%d)\n", dateText, key)
-									}
-								}
-							}
-						}
-
-						// Method 2d: Try bit-shifted Apple timestamp
-						if !found {
-							appleEpoch := time.Date(2001, 1, 1, 0, 0, 0, 0, time.UTC)
-							for shift := 8; shift <= 24; shift += 8 {
-								shifted := key >> shift
-								if shifted > 0 && shifted < 1000000000 {
-									tm := appleEpoch.Add(time.Duration(shifted) * time.Second)
-									if tm.Year() >= 2020 && tm.Year() <= 2025 {
-										dateText = tm.Format("2006-01-02")
-										found = true
-
-										if debugTableCells {
-											fmt.Printf("DEBUG: cellType=5 found date from shifted Apple timestamp: %s (key=%d, shift=%d)\n", dateText, key, shift)
-										}
-										break
-									}
-								}
-							}
-						}
-
-						// Method 2e: Try as Unix timestamp
-						if !found {
-							if key > 1000000000 && key < 2000000000 { // Reasonable range for Unix timestamps
-								tm := time.Unix(int64(key), 0)
-								if tm.Year() >= 2020 && tm.Year() <= 2025 {
-									dateText = tm.Format("2006-01-02")
-									found = true
-
-									if debugTableCells {
-										fmt.Printf("DEBUG: cellType=5 found date from Unix timestamp: %s (key=%d)\n", dateText, key)
-									}
-								}
-							}
-						}
-					}
-
-					// Method 3: Fallback to buffer extraction
-					if !found {
-						value := math.Float64frombits(LE.Uint64(activeBuffer[offset : offset+8]))
+					// Method 2: Fallback to buffer extraction
+					if dateText == "" && len(activeBuffer) >= int(offset)+20 {
+						value := math.Float64frombits(LE.Uint64(activeBuffer[offset+12 : offset+20]))
 						if value != 0 {
 							tm := time.Unix(int64(value+978307200), 0) // Apple to unix epoch 2001-01-01
 							dateText = tm.Format("2006-01-02")
-							found = true
 
 							if debugTableCells {
 								fmt.Printf("DEBUG: cellType=5 found date from buffer: %s (key=%d, value=%f)\n", dateText, key, value)
 							}
-						}
-					}
-
-					// If still not found, show placeholder
-					if !found {
-						dateText = fmt.Sprintf("[日期 %d]", key)
-						if debugTableCells {
-							fmt.Printf("DEBUG: cellType=5 no date found (key=%d)\n", key)
 						}
 					}
 				}
