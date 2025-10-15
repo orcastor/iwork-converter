@@ -1,0 +1,11 @@
+syntax = "proto2";
+
+package TN;
+option go_package = "github.com/orcastor/iwork-converter/proto/TN";
+import "TSDArchives.sos.proto";
+
+message SheetStylePropertyChangeSetArchive {
+  optional .TSD.SpecFillArchive fill = 1;
+  optional bool fill_undefined = 2;
+}
+

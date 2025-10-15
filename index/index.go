@@ -59,7 +59,8 @@ func Open(doc string) (*Index, error) {
 		}
 	}
 
-	return nil, err
+	// If index.db is not found, return a more user-friendly error
+	return nil, fmt.Errorf("无法找到有效的Pages文件结构。请确保文件是完整的Pages文档，包含index.db或正确的zip结构")
 }
 
 func (ix *Index) loadSQL(db *sql.DB) error {

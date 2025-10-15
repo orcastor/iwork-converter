@@ -1,24 +1,45 @@
 package index
 
 import (
+	"errors"
 	"fmt"
 
+	"github.com/golang/protobuf/proto"
+	"github.com/orcastor/iwork-converter/proto/TP"
 	"github.com/orcastor/iwork-converter/proto/TSA"
 	"github.com/orcastor/iwork-converter/proto/TSCE"
 	"github.com/orcastor/iwork-converter/proto/TSCH"
-	"github.com/orcastor/iwork-converter/proto/TSCH/PreUFF"
+	TSCH_PreUFF "github.com/orcastor/iwork-converter/proto/TSCH/PreUFF"
 	"github.com/orcastor/iwork-converter/proto/TSD"
 	"github.com/orcastor/iwork-converter/proto/TSK"
 	"github.com/orcastor/iwork-converter/proto/TSP"
 	"github.com/orcastor/iwork-converter/proto/TSS"
 	"github.com/orcastor/iwork-converter/proto/TST"
 	"github.com/orcastor/iwork-converter/proto/TSWP"
-
-	"github.com/golang/protobuf/proto"
 )
 
 func decodeCommon(typ uint32, payload []byte) (interface{}, error) {
 	switch typ {
+
+	case 0:
+		var value = &TSP.Reference{}
+		err := proto.Unmarshal(payload, value)
+		return value, err
+
+	case 10016:
+		var value = &TP.SectionTemplateArchive{}
+		err := proto.Unmarshal(payload, value)
+		return value, err
+
+	case 10024:
+		var value = &TP.PageTemplateArchive{}
+		err := proto.Unmarshal(payload, value)
+		return value, err
+
+	case 10166:
+		var value = &TP.TopicNumberHintsArchive{}
+		err := proto.Unmarshal(payload, value)
+		return value, err
 
 	case 11000:
 		var value = &TSP.PasteboardObject{}
@@ -37,6 +58,26 @@ func decodeCommon(typ uint32, payload []byte) (interface{}, error) {
 
 	case 11008:
 		var value = &TSP.ObjectContainer{}
+		err := proto.Unmarshal(payload, value)
+		return value, err
+
+	case 11011:
+		var value = &TSP.Reference{}
+		err := proto.Unmarshal(payload, value)
+		return value, err
+
+	case 11014:
+		var value = &TSP.Reference{}
+		err := proto.Unmarshal(payload, value)
+		return value, err
+
+	case 11015:
+		var value = &TSP.Reference{}
+		err := proto.Unmarshal(payload, value)
+		return value, err
+
+	case 12050:
+		var value = &TSCH.ChartArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
@@ -91,7 +132,7 @@ func decodeCommon(typ uint32, payload []byte) (interface{}, error) {
 		return value, err
 
 	case 201:
-		var value = &TSK.CommandHistory{}
+		var value = &TSK.LocalCommandHistory{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
@@ -201,7 +242,7 @@ func decodeCommon(typ uint32, payload []byte) (interface{}, error) {
 		return value, err
 
 	case 204:
-		var value = &TSK.ReplaceAllCommandArchive{}
+		var value = &TSK.CommandArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
@@ -266,12 +307,12 @@ func decodeCommon(typ uint32, payload []byte) (interface{}, error) {
 		return value, err
 
 	case 208:
-		var value = &TSK.CommandSelectionBehaviorHistoryArchive{}
+		var value = &TSK.CommandBehaviorArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 209:
-		var value = &TSK.UndoRedoStateCommandSelectionBehaviorArchive{}
+		var value = &TSK.CommandSelectionBehaviorArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
@@ -281,32 +322,32 @@ func decodeCommon(typ uint32, payload []byte) (interface{}, error) {
 		return value, err
 
 	case 2101:
-		var value = &TSWP.TextCommandArchive{}
+		var value = &TSWP.StorageArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 2102:
-		var value = &TSWP.InsertAttachmentCommandArchive{}
+		var value = &TSWP.StorageArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 2104:
-		var value = &TSWP.ReplaceAllTextCommandArchive{}
+		var value = &TSWP.StorageArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 2105:
-		var value = &TSWP.FormatTextCommandArchive{}
+		var value = &TSWP.StorageArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 2107:
-		var value = &TSWP.ApplyPlaceholderTextCommandArchive{}
+		var value = &TSWP.StorageArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 2108:
-		var value = &TSWP.ApplyHighlightTextCommandArchive{}
+		var value = &TSWP.StorageArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
@@ -316,37 +357,37 @@ func decodeCommon(typ uint32, payload []byte) (interface{}, error) {
 		return value, err
 
 	case 2113:
-		var value = &TSWP.CreateHyperlinkCommandArchive{}
+		var value = &TSWP.StorageArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 2114:
-		var value = &TSWP.RemoveHyperlinkCommandArchive{}
+		var value = &TSWP.StorageArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 2115:
-		var value = &TSWP.ModifyHyperlinkCommandArchive{}
+		var value = &TSWP.StorageArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 2116:
-		var value = &TSWP.ApplyRubyTextCommandArchive{}
+		var value = &TSWP.StorageArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 2117:
-		var value = &TSWP.RemoveRubyTextCommandArchive{}
+		var value = &TSWP.StorageArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 2118:
-		var value = &TSWP.ModifyRubyTextCommandArchive{}
+		var value = &TSWP.StorageArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 2119:
-		var value = &TSWP.UpdateDateTimeFieldCommandArchive{}
+		var value = &TSWP.StorageArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
@@ -356,17 +397,17 @@ func decodeCommon(typ uint32, payload []byte) (interface{}, error) {
 		return value, err
 
 	case 2120:
-		var value = &TSWP.ModifyTOCSettingsBaseCommandArchive{}
+		var value = &TSWP.StorageArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 2121:
-		var value = &TSWP.ModifyTOCSettingsForTOCInfoCommandArchive{}
+		var value = &TSWP.StorageArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 2122:
-		var value = &TSWP.ModifyTOCSettingsPresetForThemeCommandArchive{}
+		var value = &TSWP.StorageArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
@@ -376,32 +417,42 @@ func decodeCommon(typ uint32, payload []byte) (interface{}, error) {
 		return value, err
 
 	case 214:
-		var value = &TSK.AddAnnotationAuthorCommandArchive{}
+		var value = &TSK.AnnotationAuthorArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 215:
-		var value = &TSK.SetAnnotationAuthorColorCommandArchive{}
+		var value = &TSK.AnnotationAuthorArchive{}
+		err := proto.Unmarshal(payload, value)
+		return value, err
+
+	case 219:
+		var value = &TSP.Reference{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 2206:
-		var value = &TSWP.AnchorAttachmentCommandArchive{}
+		var value = &TSWP.StorageArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 2207:
-		var value = &TSWP.TextApplyThemeCommandArchive{}
+		var value = &TSWP.StorageArchive{}
+		err := proto.Unmarshal(payload, value)
+		return value, err
+
+	case 222:
+		var value = &TSP.Reference{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 2231:
-		var value = &TSWP.ShapeApplyPresetCommandArchive{}
+		var value = &TSWP.StorageArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 2232:
-		var value = &TSWP.ShapePasteStyleCommandArchive{}
+		var value = &TSWP.StorageArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
@@ -421,37 +472,47 @@ func decodeCommon(typ uint32, payload []byte) (interface{}, error) {
 		return value, err
 
 	case 2400:
-		var value = &TSWP.StyleBaseCommandArchive{}
+		var value = &TSWP.StorageArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 2401:
-		var value = &TSWP.StyleCreateCommandArchive{}
+		var value = &TSWP.StorageArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 2402:
-		var value = &TSWP.StyleRenameCommandArchive{}
+		var value = &TSWP.StorageArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 2403:
-		var value = &TSWP.StyleUpdateCommandArchive{}
+		var value = &TSWP.StorageArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 2404:
-		var value = &TSWP.StyleDeleteCommandArchive{}
+		var value = &TSWP.StorageArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 2405:
-		var value = &TSWP.StyleReorderCommandArchive{}
+		var value = &TSWP.StorageArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 2406:
-		var value = &TSWP.StyleUpdatePropertyMapCommandArchive{}
+		var value = &TSWP.StorageArchive{}
+		err := proto.Unmarshal(payload, value)
+		return value, err
+
+	case 2411:
+		var value = &TSWP.StorageArchive{}
+		err := proto.Unmarshal(payload, value)
+		return value, err
+
+	case 258:
+		var value = &TSK.CommandArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
@@ -506,117 +567,117 @@ func decodeCommon(typ uint32, payload []byte) (interface{}, error) {
 		return value, err
 
 	case 3020:
-		var value = &TSD.DrawablesCommandGroupArchive{}
+		var value = &TSD.DrawableArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 3021:
-		var value = &TSD.InfoGeometryCommandArchive{}
+		var value = &TSD.DrawableArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 3022:
-		var value = &TSD.DrawablePathSourceCommandArchive{}
+		var value = &TSD.DrawableArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 3023:
-		var value = &TSD.ShapePathSourceFlipCommandArchive{}
+		var value = &TSD.DrawableArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 3024:
-		var value = &TSD.ImageMaskCommandArchive{}
+		var value = &TSD.DrawableArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 3025:
-		var value = &TSD.ImageMediaCommandArchive{}
+		var value = &TSD.DrawableArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 3026:
-		var value = &TSD.ImageReplaceCommandArchive{}
+		var value = &TSD.DrawableArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 3027:
-		var value = &TSD.MediaOriginalSizeCommandArchive{}
+		var value = &TSD.DrawableArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 3028:
-		var value = &TSD.ShapeStyleSetValueCommandArchive{}
+		var value = &TSD.DrawableArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 3030:
-		var value = &TSD.MediaStyleSetValueCommandArchive{}
+		var value = &TSD.DrawableArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 3031:
-		var value = &TSD.ShapeApplyPresetCommandArchive{}
+		var value = &TSD.DrawableArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 3032:
-		var value = &TSD.MediaApplyPresetCommandArchive{}
+		var value = &TSD.DrawableArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 3033:
-		var value = &TSD.DrawableApplyThemeCommandArchive{}
+		var value = &TSD.DrawableArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 3034:
-		var value = &TSD.MovieSetValueCommandArchive{}
+		var value = &TSD.DrawableArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 3035:
-		var value = &TSD.ShapeSetLineEndCommandArchive{}
+		var value = &TSD.DrawableArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 3036:
-		var value = &TSD.ExteriorTextWrapCommandArchive{}
+		var value = &TSD.DrawableArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 3037:
-		var value = &TSD.MediaFlagsCommandArchive{}
+		var value = &TSD.DrawableArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 3038:
-		var value = &TSD.GroupDrawablesCommandArchive{}
+		var value = &TSD.DrawableArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 3039:
-		var value = &TSD.UngroupGroupCommandArchive{}
+		var value = &TSD.DrawableArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 3040:
-		var value = &TSD.DrawableHyperlinkCommandArchive{}
+		var value = &TSD.DrawableArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 3041:
-		var value = &TSD.ConnectionLineConnectCommandArchive{}
+		var value = &TSD.DrawableArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 3042:
-		var value = &TSD.InstantAlphaCommandArchive{}
+		var value = &TSD.DrawableArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 3043:
-		var value = &TSD.DrawableLockCommandArchive{}
+		var value = &TSD.DrawableArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
@@ -626,7 +687,7 @@ func decodeCommon(typ uint32, payload []byte) (interface{}, error) {
 		return value, err
 
 	case 3046:
-		var value = &TSD.CommandSelectionBehaviorArchive{}
+		var value = &TSD.DrawableArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
@@ -636,42 +697,42 @@ func decodeCommon(typ uint32, payload []byte) (interface{}, error) {
 		return value, err
 
 	case 3048:
-		var value = &TSD.StyledInfoSetStyleCommandArchive{}
+		var value = &TSD.DrawableArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 3049:
-		var value = &TSD.DrawableInfoCommentCommandArchive{}
+		var value = &TSD.DrawableArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 3050:
-		var value = &TSD.GuideCommandArchive{}
+		var value = &TSD.DrawableArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 3051:
-		var value = &TSD.DrawableAspectRatioLockedCommandArchive{}
+		var value = &TSD.DrawableArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 3052:
-		var value = &TSD.ContainerRemoveChildrenCommandArchive{}
+		var value = &TSD.DrawableArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 3053:
-		var value = &TSD.ContainerInsertChildrenCommandArchive{}
+		var value = &TSD.DrawableArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 3054:
-		var value = &TSD.ContainerReorderChildrenCommandArchive{}
+		var value = &TSD.DrawableArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 3055:
-		var value = &TSD.ImageAdjustmentsCommandArchive{}
+		var value = &TSD.DrawableArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
@@ -681,22 +742,32 @@ func decodeCommon(typ uint32, payload []byte) (interface{}, error) {
 		return value, err
 
 	case 3057:
-		var value = &TSD.ThemeReplaceFillPresetCommandArchive{}
+		var value = &TSD.DrawableArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 3058:
-		var value = &TSD.DrawableAccessibilityDescriptionCommandArchive{}
+		var value = &TSD.DrawableArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 3059:
-		var value = &TSD.PasteStyleCommandArchive{}
+		var value = &TSD.DrawableArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 3060:
-		var value = &TSD.CommentStorageApplyCommandArchive{}
+		var value = &TSD.CommentStorageArchive{}
+		err := proto.Unmarshal(payload, value)
+		return value, err
+
+	case 3091:
+		var value = &TSP.Reference{}
+		err := proto.Unmarshal(payload, value)
+		return value, err
+
+	case 3097:
+		var value = &TSD.DrawableArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
@@ -706,37 +777,67 @@ func decodeCommon(typ uint32, payload []byte) (interface{}, error) {
 		return value, err
 
 	case 4000:
-		var value = &TSCE.CalculationEngineArchive{}
+		var value = &TSCE.FormulaArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 4001:
-		var value = &TSCE.FormulaRewriteCommandArchive{}
+		var value = &TSCE.FormulaArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 4002:
-		var value = &TSCE.TrackedReferencesRewriteCommandArchive{}
+		var value = &TSCE.RangeReferenceArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 4003:
-		var value = &TSCE.NamedReferenceManagerArchive{}
+		var value = &TSCE.FormulaArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 4004:
-		var value = &TSCE.ReferenceTrackerArchive{}
+		var value = &TSCE.RangeReferenceArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 4005:
-		var value = &TSCE.TrackedReferenceArchive{}
+		var value = &TSCE.RangeReferenceArchive{}
+		err := proto.Unmarshal(payload, value)
+		return value, err
+
+	case 4008:
+		var value = &TSCE.CellValueArchive{}
+		err := proto.Unmarshal(payload, value)
+		return value, err
+
+	case 4009:
+		var value = &TSCE.NumberCellValueArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 401:
 		var value = &TSS.StylesheetArchive{}
+		err := proto.Unmarshal(payload, value)
+		return value, err
+
+	case 4010:
+		var value = &TSCE.StringCellValueArchive{}
+		err := proto.Unmarshal(payload, value)
+		return value, err
+
+	case 4011:
+		var value = &TSCE.BooleanCellValueArchive{}
+		err := proto.Unmarshal(payload, value)
+		return value, err
+
+	case 4012:
+		var value = &TSCE.DateCellValueArchive{}
+		err := proto.Unmarshal(payload, value)
+		return value, err
+
+	case 4013:
+		var value = &TSCE.ErrorCellValueArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
@@ -786,17 +887,17 @@ func decodeCommon(typ uint32, payload []byte) (interface{}, error) {
 		return value, err
 
 	case 418:
-		var value = &TSS.ThemeReplaceStylePresetCommandArchive{}
+		var value = &TSS.ThemeReplaceColorPresetCommandArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 5000:
-		var value = &PreUFF.ChartInfoArchive{}
+		var value = &TSCH_PreUFF.ChartInfoArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 5002:
-		var value = &PreUFF.ChartGridArchive{}
+		var value = &TSCH_PreUFF.ChartGridArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
@@ -806,42 +907,42 @@ func decodeCommon(typ uint32, payload []byte) (interface{}, error) {
 		return value, err
 
 	case 5010:
-		var value = &PreUFF.ChartStyleArchive{}
+		var value = &TSCH.ChartStyleArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 5011:
-		var value = &PreUFF.ChartSeriesStyleArchive{}
+		var value = &TSCH.ChartSeriesStyleArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 5012:
-		var value = &PreUFF.ChartAxisStyleArchive{}
+		var value = &TSCH.ChartAxisStyleArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 5013:
-		var value = &PreUFF.LegendStyleArchive{}
+		var value = &TSCH.LegendStyleArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 5014:
-		var value = &PreUFF.ChartNonStyleArchive{}
+		var value = &TSCH.ChartNonStyleArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 5015:
-		var value = &PreUFF.ChartSeriesNonStyleArchive{}
+		var value = &TSCH.ChartSeriesNonStyleArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 5016:
-		var value = &PreUFF.ChartAxisNonStyleArchive{}
+		var value = &TSCH.ChartAxisNonStyleArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 5017:
-		var value = &PreUFF.LegendNonStyleArchive{}
+		var value = &TSCH.LegendNonStyleArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
@@ -895,113 +996,118 @@ func decodeCommon(typ uint32, payload []byte) (interface{}, error) {
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
+	case 5030:
+		var value = &TSP.Reference{}
+		err := proto.Unmarshal(payload, value)
+		return value, err
+
 	case 5103:
-		var value = &TSCH.CommandSetChartTypeArchive{}
+		var value = &TSCH.ChartArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 5104:
-		var value = &TSCH.CommandSetSeriesNameArchive{}
+		var value = &TSCH.ChartArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 5105:
-		var value = &TSCH.CommandSetCategoryNameArchive{}
+		var value = &TSCH.ChartArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 5107:
-		var value = &TSCH.CommandSetScatterFormatArchive{}
+		var value = &TSCH.ChartArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 5108:
-		var value = &TSCH.CommandSetLegendFrameArchive{}
+		var value = &TSCH.ChartArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 5109:
-		var value = &TSCH.CommandSetGridValueArchive{}
+		var value = &TSCH.ChartArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 5110:
-		var value = &TSCH.CommandSetGridDirectionArchive{}
+		var value = &TSCH.ChartArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 5113:
-		var value = &TSCH.SynchronousCommandArchive{}
+		var value = &TSCH.ChartArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 5114:
-		var value = &TSCH.CommandReplaceAllArchive{}
+		var value = &TSCH.ChartArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 5115:
-		var value = &TSCH.CommandAddGridRowsArchive{}
+		var value = &TSCH.ChartArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 5116:
-		var value = &TSCH.CommandAddGridColumnsArchive{}
+		var value = &TSCH.ChartArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 5117:
-		var value = &TSCH.CommandSetPreviewLocArchive{}
+		var value = &TSCH.ChartArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 5118:
-		var value = &TSCH.CommandMoveGridRowsArchive{}
+		var value = &TSCH.ChartArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 5119:
-		var value = &TSCH.CommandMoveGridColumnsArchive{}
+		var value = &TSCH.ChartArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 5120:
-		var value = &TSCH.CommandDeleteGridRowsArchive{}
+		var value = &TSCH.ChartArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 5121:
-		var value = &TSCH.CommandDeleteGridColumnsArchive{}
+		var value = &TSCH.ChartArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 5122:
-		var value = &TSCH.CommandSetPieWedgeExplosion{}
+		var value = &TSCH.ChartArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 5123:
-		var value = &TSCH.CommandStyleSwapArchive{}
+		var value = &TSCH.ChartArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 5124:
-		var value = &TSCH.CommandChartApplyTheme{}
+		var value = &TSCH.ChartArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 5125:
-		var value = &TSCH.CommandChartApplyPreset{}
+		var value = &TSCH.ChartArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 5126:
-		var value = &TSCH.ChartCommandArchive{}
+		var value = &TSCH.ChartArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 5127:
-		var value = &TSCH.CommandReplaceGridValuesArchive{}
+		var value = &TSCH.ChartArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
@@ -1011,17 +1117,17 @@ func decodeCommon(typ uint32, payload []byte) (interface{}, error) {
 		return value, err
 
 	case 5130:
-		var value = &TSCH.CommandSetMultiDataSetIndexArchive{}
+		var value = &TSCH.ChartArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 5131:
-		var value = &TSCH.CommandReplaceThemePresetArchive{}
+		var value = &TSCH.ChartArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 5132:
-		var value = &TSCH.CommandInvalidateWPCaches{}
+		var value = &TSCH.ChartArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
@@ -1081,7 +1187,7 @@ func decodeCommon(typ uint32, payload []byte) (interface{}, error) {
 		return value, err
 
 	case 601:
-		var value = &TSA.FunctionBrowserStateArchive{}
+		var value = &TSA.DocumentArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
@@ -1091,217 +1197,217 @@ func decodeCommon(typ uint32, payload []byte) (interface{}, error) {
 		return value, err
 
 	case 602:
-		var value = &TSA.PropagatePresetCommandArchive{}
+		var value = &TSA.DocumentArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6100:
-		var value = &TST.TableCommandArchive{}
+		var value = &TST.TableModelArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6101:
-		var value = &TST.CommandDeleteCellsArchive{}
+		var value = &TST.TableInfoArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6102:
-		var value = &TST.CommandInsertColumnsOrRowsArchive{}
+		var value = &TST.TableStyleArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6103:
-		var value = &TST.CommandRemoveColumnsOrRowsArchive{}
+		var value = &TST.CellStyleArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6104:
-		var value = &TST.CommandResizeColumnOrRowArchive{}
+		var value = &TST.TableDataList{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6105:
-		var value = &TST.CommandSetCellArchive{}
+		var value = &TST.CellMapArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6106:
-		var value = &TST.CommandSetNumberOfHeadersOrFootersArchive{}
+		var value = &TST.CellListArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6107:
-		var value = &TST.CommandSetTableNameArchive{}
+		var value = &TST.MergeRegionMapArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6108:
-		var value = &TST.CommandStyleCellsArchive{}
+		var value = &TST.FormulaArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6109:
-		var value = &TST.CommandFillCellsArchive{}
+		var value = &TST.ExpressionNodeArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6110:
-		var value = &TST.CommandReplaceAllTextArchive{}
+		var value = &TST.BooleanNodeArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6111:
-		var value = &TST.CommandChangeFreezeHeaderStateArchive{}
+		var value = &TST.NumberNodeArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6112:
-		var value = &TST.CommandReplaceTextArchive{}
+		var value = &TST.StringNodeArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6113:
-		var value = &TST.CommandPasteArchive{}
+		var value = &TST.ArrayNodeArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6114:
-		var value = &TST.CommandSetTableNameEnabledArchive{}
+		var value = &TST.ListNodeArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6115:
-		var value = &TST.CommandMoveRowsArchive{}
+		var value = &TST.OperatorNodeArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6116:
-		var value = &TST.CommandMoveColumnsArchive{}
+		var value = &TST.FunctionNodeArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6117:
-		var value = &TST.CommandApplyTableStylePresetArchive{}
+		var value = &TST.DateNodeArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6118:
-		var value = &TST.CommandApplyStrokePresetArchive{}
+		var value = &TST.ReferenceNodeArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6119:
-		var value = &TST.CommandSetExplicitFormatArchive{}
+		var value = &TST.DurationNodeArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6120:
-		var value = &TST.CommandSetRepeatingHeaderEnabledArchive{}
+		var value = &TST.ConditionalStyleSetArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6121:
-		var value = &TST.CommandApplyThemeToTableArchive{}
+		var value = &TST.FilterSetArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6122:
-		var value = &TST.CommandApplyThemeChildForTableArchive{}
+		var value = &TST.UniqueIndexArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6123:
-		var value = &TST.CommandSortArchive{}
+		var value = &TST.HiddenStatesArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6124:
-		var value = &TST.CommandToggleTextPropertyArchive{}
+		var value = &TST.ExpandCollapseStateArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6125:
-		var value = &TST.CommandStyleTableArchive{}
+		var value = &TST.TokenAttachmentArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6126:
-		var value = &TST.CommandSetNumberOfDecimalPlacesArchive{}
+		var value = &TST.IdentifierNodeArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6127:
-		var value = &TST.CommandSetShowThousandsSeparatorArchive{}
+		var value = &TST.PostfixOperatorNodeArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6128:
-		var value = &TST.CommandSetNegativeNumberStyleArchive{}
+		var value = &TST.PrefixOperatorNodeArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6129:
-		var value = &TST.CommandSetFractionAccuracyArchive{}
+		var value = &TST.FunctionEndNodeArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6130:
-		var value = &TST.CommandSetSingleNumberFormatParameterArchive{}
+		var value = &TST.ArgumentPlaceholderNodeArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6131:
-		var value = &TST.CommandSetCurrencyCodeArchive{}
+		var value = &TST.EmptyExpressionNodeArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6132:
-		var value = &TST.CommandSetUseAccountingStyleArchive{}
+		var value = &TST.LetNodeArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6134:
-		var value = &TST.CommandRewriteFormulasForSortArchive{}
+		var value = &TST.InNodeArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6135:
-		var value = &TST.CommandRewriteFormulasForTectonicShiftArchive{}
+		var value = &TST.VariableNodeArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6136:
-		var value = &TST.CommandSetTableFontNameArchive{}
+		var value = &TST.LayoutHintArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6137:
-		var value = &TST.CommandSetTableFontSizeArchive{}
+		var value = &TST.CompletionTokenAttachmentArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6138:
-		var value = &TST.CommandRewriteFormulasForMoveArchive{}
+		var value = &TST.HiddenStateFormulaOwnerArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6139:
-		var value = &TST.CommandFixStylesInHeadersOrFootersArchive{}
+		var value = &TST.FormulaStoreArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6141:
-		var value = &TST.CommandResetFillPropertyToDefault{}
+		var value = &TST.MergeOperationArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6142:
-		var value = &TST.CommandSetTableNameHeightArchive{}
+		var value = &TST.MergeOwnerArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6143:
-		var value = &TST.CommandMergeUnmergeArchive{}
+		var value = &TST.PencilAnnotationArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
@@ -1311,22 +1417,22 @@ func decodeCommon(typ uint32, payload []byte) (interface{}, error) {
 		return value, err
 
 	case 6145:
-		var value = &TST.CommandHideShowArchive{}
+		var value = &TST.PencilAnnotationOwnerArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6146:
-		var value = &TST.CommandSetBaseArchive{}
+		var value = &TST.AccumulatorArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6147:
-		var value = &TST.CommandSetBasePlacesArchive{}
+		var value = &TST.GroupColumnArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6148:
-		var value = &TST.CommandSetBaseUseMinusSignArchive{}
+		var value = &TST.GroupColumnListArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
@@ -1431,7 +1537,7 @@ func decodeCommon(typ uint32, payload []byte) (interface{}, error) {
 		return value, err
 
 	case 6200:
-		var value = &TST.FormulaEditingCommandGroupArchive{}
+		var value = &TST.TableStylePresetArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
@@ -1441,12 +1547,12 @@ func decodeCommon(typ uint32, payload []byte) (interface{}, error) {
 		return value, err
 
 	case 6202:
-		var value = &TST.CommandCoerceMultipleCellsArchive{}
+		var value = &TST.ColumnAggregateArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6203:
-		var value = &TST.CommandSetMultipleCellsCustomArchive{}
+		var value = &TST.ColumnAggregateListArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
@@ -1456,7 +1562,7 @@ func decodeCommon(typ uint32, payload []byte) (interface{}, error) {
 		return value, err
 
 	case 6205:
-		var value = &TST.CommandSetAutomaticDurationUnitsArchive{}
+		var value = &TST.TableModelArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
@@ -1466,57 +1572,57 @@ func decodeCommon(typ uint32, payload []byte) (interface{}, error) {
 		return value, err
 
 	case 6207:
-		var value = &TST.CommandSetControlMinimumArchive{}
+		var value = &TST.TableModelArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6208:
-		var value = &TST.CommandSetControlMaximumArchive{}
+		var value = &TST.TableModelArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6209:
-		var value = &TST.CommandSetControlIncrementArchive{}
+		var value = &TST.TableModelArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6210:
-		var value = &TST.CommandSetControlCellsDisplayNumberFormatArchive{}
+		var value = &TST.TableModelArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6211:
-		var value = &TST.CommandSetMultipleCellsMultipleChoiceListArchive{}
+		var value = &TST.TableModelArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6212:
-		var value = &TST.CommandSetMultipleChoiceListFormatForEditedItemArchive{}
+		var value = &TST.TableModelArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6213:
-		var value = &TST.CommandSetMultipleChoiceListFormatForDeleteItemArchive{}
+		var value = &TST.TableModelArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6214:
-		var value = &TST.CommandSetMultipleChoiceListFormatForReorderItemArchive{}
+		var value = &TST.TableModelArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6215:
-		var value = &TST.CommandSetMultipleChoiceListFormatForInitialValueArchive{}
+		var value = &TST.TableModelArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6216:
-		var value = &TST.CommandRewriteFormulasForCellMergeArchive{}
+		var value = &TST.TableModelArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6217:
-		var value = &TST.TableInfoGeometryCommandArchive{}
+		var value = &TST.TableStylePresetArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
@@ -1526,7 +1632,7 @@ func decodeCommon(typ uint32, payload []byte) (interface{}, error) {
 		return value, err
 
 	case 6219:
-		var value = &TST.EditingStateArchive{}
+		var value = &TST.TableStylePresetArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
@@ -1536,67 +1642,67 @@ func decodeCommon(typ uint32, payload []byte) (interface{}, error) {
 		return value, err
 
 	case 6221:
-		var value = &TST.CommandSetFiltersEnabledArchive{}
+		var value = &TST.TableModelArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6222:
-		var value = &TST.CommandRewriteFilterFormulasForTectonicShiftArchive{}
+		var value = &TST.TableModelArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6223:
-		var value = &TST.CommandRewriteFilterFormulasForSortArchive{}
+		var value = &TST.TableModelArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6224:
-		var value = &TST.CommandRewriteFilterFormulasForTableResizeArchive{}
+		var value = &TST.TableModelArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6225:
-		var value = &TST.CommandSetAutomaticFormatArchive{}
+		var value = &TST.TableModelArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6226:
-		var value = &TST.CommandTextPreflightInsertCellArchive{}
+		var value = &TST.TableModelArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6227:
-		var value = &TST.FormulaEditingCommandSelectionBehaviorArchive{}
+		var value = &TST.TableStylePresetArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6228:
-		var value = &TST.CommandDeleteCellContentsArchive{}
+		var value = &TST.TableModelArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6229:
-		var value = &TST.CommandPostflightSetCellArchive{}
+		var value = &TST.TableModelArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6231:
-		var value = &TST.CommandRewriteConditionalStylesForTectonicShiftArchive{}
+		var value = &TST.TableModelArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6232:
-		var value = &TST.CommandRewriteConditionalStylesForSortArchive{}
+		var value = &TST.TableModelArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6233:
-		var value = &TST.CommandRewriteConditionalStylesForRangeMoveArchive{}
+		var value = &TST.TableModelArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6234:
-		var value = &TST.CommandRewriteConditionalStylesForCellMergeArchive{}
+		var value = &TST.TableModelArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
@@ -1606,52 +1712,52 @@ func decodeCommon(typ uint32, payload []byte) (interface{}, error) {
 		return value, err
 
 	case 6236:
-		var value = &TST.UndoRedoStateCommandSelectionBehaviorArchive{}
+		var value = &TST.TableStylePresetArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6237:
-		var value = &TST.CommandSetStyleApplyClearsAllFlagArchive{}
+		var value = &TST.TableModelArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6238:
-		var value = &TST.CommandSetDateTimeFormatArchive{}
+		var value = &TST.TableModelArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6239:
-		var value = &TST.TableCommandSelectionBehaviorArchive{}
+		var value = &TST.TableStylePresetArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6240:
-		var value = &TST.CommandAddQuickFilterRulesArchive{}
+		var value = &TST.TableModelArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6241:
-		var value = &TST.CommandModifyFilterRuleArchive{}
+		var value = &TST.TableModelArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6242:
-		var value = &TST.CommandDeleteFilterRulesArchive{}
+		var value = &TST.TableModelArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6244:
-		var value = &TST.CommandApplyCellCommentArchive{}
+		var value = &TST.TableModelArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6245:
-		var value = &TST.CommandApplyConditionalStyleSetArchive{}
+		var value = &TST.TableModelArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6246:
-		var value = &TST.CommandSetFormulaTokenizationArchive{}
+		var value = &TST.TableModelArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
@@ -1661,51 +1767,108 @@ func decodeCommon(typ uint32, payload []byte) (interface{}, error) {
 		return value, err
 
 	case 6248:
-		var value = &TST.CommandSetFilterEnabledArchive{}
+		var value = &TST.TableModelArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6249:
-		var value = &TST.CommandSetFilterRuleEnabledArchive{}
+		var value = &TST.TableModelArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6250:
-		var value = &TST.CommandSetFilterSetTypeArchive{}
+		var value = &TST.TableModelArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6251:
-		var value = &TST.CommandSetStyleNetworkArchive{}
+		var value = &TST.TableModelArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6252:
-		var value = &TST.CommandMutateCellsArchive{}
+		var value = &TST.TableModelArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6253:
-		var value = &TST.DisableTableNameSelectionBehaviorArchive{}
+		var value = &TST.TableStylePresetArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6254:
-		var value = &TST.CommandDisableFilterRulesForColumnArchive{}
+		var value = &TST.TableModelArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6255:
-		var value = &TST.CommandSetTextStyleArchive{}
+		var value = &TST.TableModelArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 6256:
-		var value = &TST.CommandNotifyForTransformingArchive{}
+		var value = &TST.TableModelArchive{}
+		err := proto.Unmarshal(payload, value)
+		return value, err
+
+	case 6267:
+		var value = &TST.TableModelArchive{}
+		err := proto.Unmarshal(payload, value)
+		return value, err
+
+	case 6305:
+		var value = &TST.TableModelArchive{}
+		err := proto.Unmarshal(payload, value)
+		return value, err
+
+	case 6306:
+		var value = &TST.TableStyleArchive{}
+		err := proto.Unmarshal(payload, value)
+		return value, err
+
+	case 6316:
+		var value = &TST.DataStore{}
+		err := proto.Unmarshal(payload, value)
+		return value, err
+
+	case 6317:
+		var value = &TST.TableStyleArchive{}
+		err := proto.Unmarshal(payload, value)
+		return value, err
+
+	case 6318:
+		var value = &TST.TableModelArchive{}
+		err := proto.Unmarshal(payload, value)
+		return value, err
+
+	case 6365:
+		var value = &TST.ControlCellSelectionArchive{}
+		err := proto.Unmarshal(payload, value)
+		return value, err
+
+	case 6366:
+		var value = &TST.TableModelArchive{}
+		err := proto.Unmarshal(payload, value)
+		return value, err
+
+	case 6372:
+		var value = &TST.TableStyleArchive{}
+		err := proto.Unmarshal(payload, value)
+		return value, err
+
+	case 6373:
+		var value = &TST.TableStyleArchive{}
+		err := proto.Unmarshal(payload, value)
+		return value, err
+
+	case 6383:
+		var value = &TST.TableStyleArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	default:
-		return nil, fmt.Errorf("Unknown type %d", typ)
+
+		return nil, errors.New(fmt.Sprintf("Unknown type %d", typ))
+
 	}
 }

@@ -1,17 +1,11 @@
 package index
 
 import (
-	"github.com/orcastor/iwork-converter/proto/TP"
-
 	"github.com/golang/protobuf/proto"
+	"github.com/orcastor/iwork-converter/proto/TP"
 )
 
 func decodePages(typ uint32, payload []byte) (interface{}, error) {
-	value, err := decodeCommon(typ, payload)
-	if err == nil {
-		return value, err
-	}
-
 	switch typ {
 
 	case 10000:
@@ -45,107 +39,107 @@ func decodePages(typ uint32, payload []byte) (interface{}, error) {
 		return value, err
 
 	case 10101:
-		var value = &TP.InsertDrawablesCommandArchive{}
+		var value = &TP.DocumentArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 10102:
-		var value = &TP.RemoveDrawablesCommandArchive{}
+		var value = &TP.DocumentArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 10108:
-		var value = &TP.PasteAnchoredDrawablesCommandArchive{}
+		var value = &TP.DocumentArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 10109:
-		var value = &TP.PasteDrawablesCommandArchive{}
+		var value = &TP.DocumentArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 10110:
-		var value = &TP.MoveDrawablesAttachedCommandArchive{}
+		var value = &TP.DocumentArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 10111:
-		var value = &TP.MoveDrawablesFloatingCommandArchive{}
+		var value = &TP.DocumentArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 10112:
-		var value = &TP.MoveInlineDrawableAnchoredCommandArchive{}
+		var value = &TP.DocumentArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 10113:
-		var value = &TP.InsertFootnoteCommandArchive{}
+		var value = &TP.DocumentArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 10114:
-		var value = &TP.ChangeFootnoteFormatCommandArchive{}
+		var value = &TP.DocumentArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 10115:
-		var value = &TP.ChangeFootnoteKindCommandArchive{}
+		var value = &TP.DocumentArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 10116:
-		var value = &TP.ChangeFootnoteNumberingCommandArchive{}
+		var value = &TP.DocumentArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 10117:
-		var value = &TP.ToggleBodyLayoutDirectionCommandArchive{}
+		var value = &TP.DocumentArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 10118:
-		var value = &TP.ChangeFootnoteSpacingCommandArchive{}
+		var value = &TP.DocumentArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 10119:
-		var value = &TP.MoveAnchoredDrawableInlineCommandArchive{}
+		var value = &TP.DocumentArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 10120:
-		var value = &TP.ChangeSectionMarginsCommandArchive{}
+		var value = &TP.DocumentArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 10121:
-		var value = &TP.ChangeDocumentPrinterOptionsCommandArchive{}
+		var value = &TP.DocumentArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 10125:
-		var value = &TP.InsertMasterDrawablesCommandArchive{}
+		var value = &TP.DocumentArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 10126:
-		var value = &TP.RemoveMasterDrawablesCommandArchive{}
+		var value = &TP.DocumentArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 10127:
-		var value = &TP.PasteMasterDrawablesCommandArchive{}
+		var value = &TP.DocumentArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 10128:
-		var value = &TP.NudgeDrawablesCommandArchive{}
+		var value = &TP.DocumentArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 10130:
-		var value = &TP.MoveDrawablesPageIndexCommandArchive{}
+		var value = &TP.DocumentArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
@@ -160,32 +154,32 @@ func decodePages(typ uint32, payload []byte) (interface{}, error) {
 		return value, err
 
 	case 10133:
-		var value = &TP.ViewStateArchive{}
+		var value = &TP.DocumentArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 10134:
-		var value = &TP.ChangeHeaderFooterVisibilityCommandArchive{}
+		var value = &TP.DocumentArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 10140:
-		var value = &TP.MoveMasterDrawableZOrderCommandArchive{}
+		var value = &TP.DocumentArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 10141:
-		var value = &TP.SwapDrawableZOrderCommandArchive{}
+		var value = &TP.DocumentArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 10142:
-		var value = &TP.RemoveAnchoredDrawableCommandArchive{}
+		var value = &TP.DocumentArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 10143:
-		var value = &TP.PageMasterArchive{}
+		var value = &TP.DocumentArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
@@ -195,52 +189,52 @@ func decodePages(typ uint32, payload []byte) (interface{}, error) {
 		return value, err
 
 	case 10148:
-		var value = &TP.ChangeCTVisibilityCommandArchive{}
+		var value = &TP.DocumentArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 10149:
-		var value = &TP.TrackChangesCommandArchive{}
+		var value = &TP.DocumentArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 10150:
-		var value = &TP.DocumentHyphenationCommandArchive{}
+		var value = &TP.DocumentArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 10151:
-		var value = &TP.DocumentLigaturesCommandArchive{}
+		var value = &TP.DocumentArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 10152:
-		var value = &TP.InsertSectionBreakCommandArchive{}
+		var value = &TP.DocumentArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 10153:
-		var value = &TP.DeleteSectionCommandArchive{}
+		var value = &TP.DocumentArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 10154:
-		var value = &TP.ReplaceSectionCommandArchive{}
+		var value = &TP.DocumentArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 10155:
-		var value = &TP.ChangeSectionPropertyCommandArchive{}
+		var value = &TP.DocumentArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 10156:
-		var value = &TP.DocumentHasBodyCommandArchive{}
+		var value = &TP.DocumentArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 10157:
-		var value = &TP.PauseChangeTrackingCommandArchive{}
+		var value = &TP.DocumentArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
@@ -250,6 +244,9 @@ func decodePages(typ uint32, payload []byte) (interface{}, error) {
 		return value, err
 
 	default:
+
+		// 兜底逻辑：尝试使用decodeCommon
 		return decodeCommon(typ, payload)
+
 	}
 }

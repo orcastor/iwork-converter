@@ -1,28 +1,27 @@
 syntax = "proto2";
 
+package TSCH;
+option go_package = "github.com/orcastor/iwork-converter/proto/TSCH";
 import "TSPMessages.proto";
 import "TSKArchives.proto";
+import "TSCKArchives.proto";
 import "TSDArchives.proto";
 import "TSSArchives.proto";
 import "TSCHArchives.Common.proto";
-import "TSCHArchives.GEN.proto";
 import "TSCH3DArchives.proto";
-import "TSCHPreUFFArchives.proto";
-package TSCH;
 
 message ChartDrawableArchive {
   optional .TSD.DrawableArchive super = 1;
-  extensions 10000 to 536870911;
 }
 
 message ChartArchive {
-  optional .TSCH.ChartType chart_type = 1;
-  optional .TSCH.ScatterFormat scatter_format = 2;
-  optional .TSCH.RectArchive legend_frame = 3;
+  optional ChartType chart_type = 1;
+  optional ScatterFormat scatter_format = 2;
+  optional RectArchive legend_frame = 3;
   optional .TSP.Reference preset = 4;
-  optional .TSCH.SeriesDirection series_direction = 5;
+  optional SeriesDirection series_direction = 5;
   optional bool contains_default_data = 6;
-  optional .TSCH.ChartGridArchive grid = 7;
+  optional ChartGridArchive grid = 7;
   optional .TSP.Reference mediator = 8;
   optional .TSP.Reference chart_style = 9;
   optional .TSP.Reference chart_non_style = 10;
@@ -33,41 +32,80 @@ message ChartArchive {
   repeated .TSP.Reference category_axis_styles = 15;
   repeated .TSP.Reference category_axis_nonstyles = 16;
   repeated .TSP.Reference series_theme_styles = 17;
-  optional .TSCH.SparseReferenceArrayArchive series_private_styles = 18;
-  optional .TSCH.SparseReferenceArrayArchive series_non_styles = 19;
+  optional .TSP.SparseReferenceArray series_private_styles = 18;
+  optional .TSP.SparseReferenceArray series_non_styles = 19;
   repeated .TSP.Reference paragraph_styles = 20;
   optional uint32 multidataset_index = 21;
   optional bool needs_calc_engine_deferred_import_action = 22;
-  extensions 10000 to 536870911;
-  extend .TSCH.ChartDrawableArchive {
-    optional .TSCH.ChartArchive unity = 10000;
-  }
+  optional .TSP.Reference owned_preset = 23;
+  optional bool is_dirty = 24;
+}
+
+message ChartMultiDataIndexUpgrade {
+}
+
+message ChartGarlicMinMaxUpgrade {
+  optional double horizontal_min = 1;
+  optional double horizontal_max = 2;
+  optional double value_min = 3;
+  optional double value_max = 4;
+}
+
+message ChartGarlicLabelFormatUpgrade {
+  optional string value_prefix = 1;
+  optional string value_suffix = 2;
+  optional bool value_use_separator = 3;
+  optional string horizontal_prefix = 4;
+  optional string horizontal_suffix = 5;
+  optional bool horizontal_use_separator = 6;
 }
 
 message ChartPasteboardAdditionsArchive {
-  extend .TSCH.ChartArchive {
-    optional uint32 preset_index_for_pasteboard = 10000;
-    optional bytes preset_uuid_for_pasteboard = 10001;
-  }
+}
+
+message ChartPreserveAppearanceForPresetArchive {
+}
+
+message ChartSupportsProportionalBendedCalloutLinesArchive {
+}
+
+message ChartSupportsRoundedCornersArchive {
+}
+
+message ChartSupportsSeriesPropertySpacingArchive {
+}
+
+message ChartSupportsStackedSummaryLabelsArchive {
 }
 
 message ChartGridArchive {
-  message GridRow {
-    message GridValue {
-      optional double numeric_value = 1;
-      optional double date_value = 2;
+  message ChartGridRowColumnIdMap {
+    message Entry {
+      required string uniqueId = 1;
+      required uint32 index = 2;
     }
-    repeated .TSCH.ChartGridArchive.GridRow.GridValue value = 1;
+
+    repeated ChartGridArchive.ChartGridRowColumnIdMap.Entry row_id_map = 1;
+    repeated ChartGridArchive.ChartGridRowColumnIdMap.Entry column_id_map = 2;
   }
+
   repeated string row_name = 1;
   repeated string column_name = 2;
-  repeated .TSCH.ChartGridArchive.GridRow grid_row = 3;
+  repeated GridRow grid_row = 3;
+  optional ChartGridArchive.ChartGridRowColumnIdMap idMap = 4;
 }
 
 message ChartMediatorArchive {
   optional .TSP.Reference info = 1;
   repeated uint32 local_series_indexes = 2;
   repeated uint32 remote_series_indexes = 3;
+}
+
+message ChartFillSetArchive {
+  required string identifier = 1;
+  required string lookup_string = 2;
+  optional uint32 number_of_theme_series_styles = 3;
+  repeated .TSP.Reference series_styles = 4;
 }
 
 message ChartStylePreset {
@@ -82,9 +120,6 @@ message ChartStylePreset {
 
 message ChartPresetsArchive {
   repeated .TSP.Reference chart_presets = 1;
-  extend .TSS.ThemeArchive {
-    optional .TSCH.ChartPresetsArchive extension = 120;
-  }
 }
 
 message PropertyValueStorageContainerArchive {
@@ -92,19 +127,19 @@ message PropertyValueStorageContainerArchive {
   optional .TSP.Reference chart_nonstyle = 2;
   optional .TSP.Reference legend_style = 3;
   optional .TSP.Reference legend_nonstyle = 4;
-  optional .TSCH.SparseReferenceArrayArchive value_axis_styles = 5;
-  optional .TSCH.SparseReferenceArrayArchive value_axis_nonstyles = 6;
-  optional .TSCH.SparseReferenceArrayArchive category_axis_styles = 7;
-  optional .TSCH.SparseReferenceArrayArchive category_axis_nonstyles = 8;
-  optional .TSCH.SparseReferenceArrayArchive series_theme_styles = 9;
-  optional .TSCH.SparseReferenceArrayArchive series_private_styles = 10;
-  optional .TSCH.SparseReferenceArrayArchive series_nonstyles = 11;
-  optional .TSCH.SparseReferenceArrayArchive paragraph_styles = 12;
+  optional .TSP.SparseReferenceArray value_axis_styles = 5;
+  optional .TSP.SparseReferenceArray value_axis_nonstyles = 6;
+  optional .TSP.SparseReferenceArray category_axis_styles = 7;
+  optional .TSP.SparseReferenceArray category_axis_nonstyles = 8;
+  optional .TSP.SparseReferenceArray series_theme_styles = 9;
+  optional .TSP.SparseReferenceArray series_private_styles = 10;
+  optional .TSP.SparseReferenceArray series_nonstyles = 11;
+  optional .TSP.SparseReferenceArray paragraph_styles = 12;
 }
 
 message StylePasteboardDataArchive {
   optional .TSS.StyleArchive super = 1;
-  optional .TSCH.PropertyValueStorageContainerArchive style_network = 2;
+  optional PropertyValueStorageContainerArchive style_network = 2;
   optional bool copied_from_entire_chart = 3;
 }
 
@@ -114,24 +149,34 @@ message ChartSelectionPathTypeArchive {
 }
 
 message ChartAxisIDArchive {
-  optional .TSCH.AxisType axis_type = 1;
+  optional AxisType axis_type = 1;
   optional uint32 ordinal = 2;
 }
 
 message ChartSelectionPathArgumentArchive {
   optional uint32 number = 1;
-  optional .TSCH.ChartAxisIDArchive axis_id = 2;
+  optional ChartAxisIDArchive axis_id = 2;
 }
 
 message ChartSelectionPathArchive {
-  optional .TSCH.ChartSelectionPathTypeArchive path_type = 1;
-  optional .TSCH.ChartSelectionPathArchive sub_selection = 2;
-  repeated .TSCH.ChartSelectionPathArgumentArchive arguments = 3;
+  optional ChartSelectionPathTypeArchive path_type = 1;
+  optional ChartSelectionPathArchive sub_selection = 2;
+  repeated ChartSelectionPathArgumentArchive arguments = 3;
 }
 
 message ChartSelectionArchive {
+  optional .TSD.DrawableSelectionArchive super = 3;
   optional .TSP.Reference chart = 1;
-  repeated .TSCH.ChartSelectionPathArchive paths = 2;
+  repeated ChartSelectionPathArchive paths = 2;
+}
+
+message ChartCDESelectionArchive {
+  optional .TSP.Reference chart = 1;
+  optional int32 selection_type = 2;
+  optional uint32 row_location = 3;
+  optional uint32 row_length = 4;
+  optional uint32 column_location = 5;
+  optional uint32 column_length = 6;
 }
 
 message ChartUIState {
@@ -140,16 +185,77 @@ message ChartUIState {
   optional int32 cde_last_col_selected = 3;
   optional int32 cde_last_row_count = 4;
   optional int32 cde_last_col_count = 5;
+  optional bool cde_use_full_keyboard = 6;
+  optional int32 multi_data_set_index = 7;
+  optional bool is_valid_multi_data_set_index = 8;
+}
+
+message ChartUIStateMultiDataIndexUpgrade {
 }
 
 message ChartFormatStructExtensions {
-  extend .TSK.FormatStructArchive {
-    optional string prefix = 10000;
-    optional string suffix = 10001;
-  }
 }
 
-extend .TSCH.ChartArchive {
-  optional bool scene3d_settings_constant_depth = 10002;
+message ChartReferenceLineNonStyleItem {
+  required .TSP.Reference non_style = 1;
+  required .TSP.UUID uuid = 2;
+}
+
+message ChartAxisReferenceLineNonStylesArchive {
+  required ChartAxisIDArchive axis_id = 1;
+  repeated ChartReferenceLineNonStyleItem reference_line_non_style_items = 2;
+}
+
+message ChartAxisReferenceLineStylesArchive {
+  required ChartAxisIDArchive axis_id = 1;
+  optional .TSP.SparseReferenceArray reference_line_styles = 2;
+}
+
+message ChartReferenceLinesArchive {
+  repeated ChartAxisReferenceLineNonStylesArchive reference_line_non_styles_map = 1;
+  repeated ChartAxisReferenceLineStylesArchive reference_line_styles_map = 2;
+  optional .TSP.Reference theme_preset_reference_line_style = 3;
+}
+
+message ChartPresetReferenceLineStylesArchive {
+  repeated .TSP.Reference reference_line_styles = 1;
+}
+
+message ChartAxisReferenceLineSparseNonStylesArchive {
+  required ChartAxisIDArchive axis_id = 1;
+  repeated ChartReferenceLineNonStyleItem reference_line_non_style_items = 2;
+}
+
+message PropertyValueStorageContainerReferenceLinesArchive {
+  repeated ChartAxisReferenceLineSparseNonStylesArchive reference_line_non_styles_map = 1;
+  repeated ChartAxisReferenceLineStylesArchive reference_line_styles_map = 2;
+  optional .TSP.Reference theme_preset_reference_line_style = 3;
+}
+
+message CollaboratorCDECursorSubselectionArchive {
+  optional int32 row_location = 1;
+  optional int32 row_length = 2;
+  optional int32 column_location = 3;
+  optional int32 column_length = 4;
+}
+
+message CollaboratorChartTitleCursorSubselectionArchive {
+  optional bool chart_title_selected = 1;
+}
+
+message CachedAxisDataFormatterPersistableStyleObject {
+  optional ChartAxisIDArchive axis_id = 1;
+  optional .TSK.FormatStructArchive style_object = 2;
+}
+
+message CachedSeriesDataFormatterPersistableStyleObject {
+  optional int32 series_index = 1;
+  optional .TSK.FormatStructArchive style_object = 2;
+}
+
+message CachedDataFormatterPersistableStyleObjects {
+  repeated CachedAxisDataFormatterPersistableStyleObject axis_data_formatter_list = 1;
+  repeated CachedSeriesDataFormatterPersistableStyleObject series_data_formatter_list = 2;
+  optional .TSK.FormatStructArchive summary_label_style_object = 3;
 }
 

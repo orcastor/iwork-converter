@@ -1,13 +1,15 @@
 package index
 
 import (
-	"github.com/orcastor/iwork-converter/proto/KN"
-	"github.com/orcastor/iwork-converter/proto/TSWP"
 	"github.com/golang/protobuf/proto"
+	"github.com/orcastor/iwork-converter/proto/KN"
+	"github.com/orcastor/iwork-converter/proto/TSP"
+	"github.com/orcastor/iwork-converter/proto/TSWP"
 )
 
 func decodeKeynote(typ uint32, payload []byte) (interface{}, error) {
 	switch typ {
+
 	case 1:
 		var value = &KN.DocumentArchive{}
 		err := proto.Unmarshal(payload, value)
@@ -19,7 +21,7 @@ func decodeKeynote(typ uint32, payload []byte) (interface{}, error) {
 		return value, err
 
 	case 100:
-		var value = &KN.CommandBuildSetValueArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
@@ -29,47 +31,47 @@ func decodeKeynote(typ uint32, payload []byte) (interface{}, error) {
 		return value, err
 
 	case 101:
-		var value = &KN.CommandShowInsertSlideArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 102:
-		var value = &KN.CommandShowMoveSlideArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 103:
-		var value = &KN.CommandShowRemoveSlideArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 104:
-		var value = &KN.CommandSlideInsertDrawablesArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 105:
-		var value = &KN.CommandSlideRemoveDrawableArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 106:
-		var value = &KN.CommandSlideNodeSetPropertyArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 107:
-		var value = &KN.CommandSlideInsertBuildArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 108:
-		var value = &KN.CommandSlideMoveBuildWithoutMovingChunksArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 109:
-		var value = &KN.CommandSlideRemoveBuildArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
@@ -79,52 +81,52 @@ func decodeKeynote(typ uint32, payload []byte) (interface{}, error) {
 		return value, err
 
 	case 110:
-		var value = &KN.CommandSlideInsertBuildChunkArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 111:
-		var value = &KN.CommandSlideMoveBuildChunkArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 112:
-		var value = &KN.CommandSlideRemoveBuildChunkArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 113:
-		var value = &KN.CommandSlideSetValueArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 114:
-		var value = &KN.CommandTransitionSetValueArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 115:
-		var value = &KN.UIStateCommandGroupArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 116:
-		var value = &KN.CommandSlidePasteDrawablesArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 117:
-		var value = &KN.CommandSlideApplyThemeArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 118:
-		var value = &KN.CommandSlideMoveDrawableZOrderArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 119:
-		var value = &KN.CommandChangeMasterSlideArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
@@ -134,72 +136,72 @@ func decodeKeynote(typ uint32, payload []byte) (interface{}, error) {
 		return value, err
 
 	case 123:
-		var value = &KN.CommandShowSetSlideNumberVisibilityArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 124:
-		var value = &KN.CommandShowSetValueArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 128:
-		var value = &KN.CommandShowMarkOutOfSyncRecordingArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 129:
-		var value = &KN.CommandShowRemoveRecordingArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 130:
-		var value = &KN.CommandShowReplaceRecordingArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 131:
-		var value = &KN.CommandShowSetSoundtrack{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 132:
-		var value = &KN.CommandSoundtrackSetValue{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 133:
-		var value = &KN.CommandMasterRescaleArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 134:
-		var value = &KN.CommandMoveMastersArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 135:
-		var value = &KN.CommandInsertMasterArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 136:
-		var value = &KN.CommandSlideSetStyleArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 137:
-		var value = &KN.CommandSlideSetPlaceholdersForTagsArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 138:
-		var value = &KN.CommandBuildChunkSetValueArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 139:
-		var value = &KN.CommandSlideMoveBuildChunksArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
@@ -209,47 +211,47 @@ func decodeKeynote(typ uint32, payload []byte) (interface{}, error) {
 		return value, err
 
 	case 140:
-		var value = &KN.CommandRemoveMasterArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 141:
-		var value = &KN.CommandRenameMasterArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 142:
-		var value = &KN.CommandMasterSetThumbnailTextArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 143:
-		var value = &KN.CommandShowChangeThemeArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 144:
-		var value = &KN.CommandSlidePrimitiveSetMasterArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 145:
-		var value = &KN.CommandMasterSetBodyStylesArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 146:
-		var value = &KN.CommandSlideReapplyMasterArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 147:
-		var value = &KN.SlideCollectionCommandSelectionBehaviorArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
 	case 148:
-		var value = &KN.ChartInfoGeometryCommandArchive{}
+		var value = &KN.SlideArchive{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
@@ -270,6 +272,16 @@ func decodeKeynote(typ uint32, payload []byte) (interface{}, error) {
 
 	case 18:
 		var value = &KN.RecordingMovieTrackArchive{}
+		err := proto.Unmarshal(payload, value)
+		return value, err
+
+	case 184:
+		var value = &TSP.Reference{}
+		err := proto.Unmarshal(payload, value)
+		return value, err
+
+	case 185:
+		var value = &TSP.Reference{}
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
@@ -313,6 +325,11 @@ func decodeKeynote(typ uint32, payload []byte) (interface{}, error) {
 		err := proto.Unmarshal(payload, value)
 		return value, err
 
+	case 26:
+		var value = &TSP.Reference{}
+		err := proto.Unmarshal(payload, value)
+		return value, err
+
 	case 3:
 		var value = &KN.UIStateArchive{}
 		err := proto.Unmarshal(payload, value)
@@ -349,6 +366,9 @@ func decodeKeynote(typ uint32, payload []byte) (interface{}, error) {
 		return value, err
 
 	default:
+
+		// 兜底逻辑：尝试使用decodeCommon
 		return decodeCommon(typ, payload)
+
 	}
 }
